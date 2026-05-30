@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: planwerk
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DB_DIR
+        value: /data
+    disk:
+      name: planwerk-db
+      mountPath: /data
+      sizeGB: 1

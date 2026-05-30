@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projekttracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #1a2342; --navy2: #232f52; --teal: #00897b; --teal2: #00bfa5;
+  --amber: #e6a817; --coral: #c0392b; --green: #2e7d52;
+  --ice: #e8edf8; --ice2: #f4f7ff; --muted: #8a94b0;
+  --border: #dde3f0; --text: #1a2342; --white: #ffffff;
+  --radius: 10px; --shadow: 0 2px 16px rgba(26,35,66,0.10);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--ice2); color: var(--text); min-height: 100vh; }
+
+.topbar {
+  background: var(--navy); color: var(--white);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; height: 54px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+}
+.topbar-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.topbar-title span { color: var(--teal2); }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.lang-toggle { display: flex; background: rgba(255,255,255,0.1); border-radius: 20px; overflow: hidden; }
+.lang-btn { padding: 5px 14px; border: none; background: transparent; color: rgba(255,255,255,0.6); font-size: 12px; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.2s; }
+.lang-btn.active { background: var(--teal); color: white; }
+.search-box { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 6px 14px; color: white; font-size: 13px; font-family: 'DM Sans', sans-serif; width: 190px; outline: none; }
+.search-box::placeholder { color: rgba(255,255,255,0.4); }
+.hamburger { display: none; background: rgba(255,255,255,0.1); border: none; border-radius: 8px; color: white; font-size: 18px; width: 36px; height: 36px; cursor: pointer; }
+
+.layout { display: flex; min-height: calc(100vh - 54px); }
+
+.sidebar { width: 250px; background: var(--navy2); flex-shrink: 0; padding: 16px 0; }
+.sidebar-label { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; padding: 0 18px 8px; }
+.proj-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; cursor: pointer; border-left: 3px solid transparent; transition: background 0.15s; }
+.proj-item:hover { background: rgba(255,255,255,0.06); }
+.proj-item.active { background: rgba(0,137,123,0.18); border-left-color: var(--teal2); }
+.proj-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.proj-name { font-size: 13px; font-weight: 500; color: white; flex: 1; }
+.proj-count { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 1px 7px; font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); }
+.add-proj-btn { margin: 12px 14px 0; padding: 9px; border: 1px dashed rgba(255,255,255,0.2); border-radius: var(--radius); background: transparent; color: rgba(255,255,255,0.5); font-size: 12px; cursor: pointer; width: calc(100% - 28px); font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
+.add-proj-btn:hover { border-color: var(--teal2); color: var(--teal2); }
+
+.main { flex: 1; padding: 24px; overflow-y: auto; }
+
+.proj-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+.proj-title { font-size: 20px; font-weight: 600; }
+.proj-meta { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.btn-primary { background: var(--teal); color: white; border: none; border-radius: var(--radius); padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+.btn-primary:hover { background: var(--teal2); }
+
+.stats-bar { display: flex; gap: 12px; margin-bottom: 20px; }
+.stat-card { background: white; border-radius: var(--radius); padding: 14px 18px; flex: 1; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.stat-label { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 22px; font-weight: 600; color: var(--navy); margin-top: 4px; font-family: 'DM Mono', monospace; }
+.stat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.filter-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.filter-btn { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); background: white; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--muted); transition: all 0.2s; }
+.filter-btn.active, .filter-btn:hover { background: var(--navy); color: white; border-color: var(--navy); }
+
+.card { background: white; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden; border-left: 4px solid #ccc; }
+.card[data-st="Offen"] { border-left-color: #8a94b0; }
+.card[data-st="In Bearbeitung"] { border-left-color: var(--teal); }
+.card[data-st="In Prüfung"] { border-left-color: var(--amber); }
+.card[data-st="Freigegeben"] { border-left-color: var(--green); }
+.card[data-st="Abgeschlossen"] { border-left-color: #9c27b0; }
+
+.card-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; user-select: none; }
+.pill { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; font-family: 'DM Mono', monospace; white-space: nowrap; flex-shrink: 0; }
+.st-offen { background: #e8edf8; color: #4a5580; }
+.st-inb { background: #e0f4f1; color: #00695c; }
+.st-prue { background: #fff3e0; color: #e65100; }
+.st-frei { background: #e8f5e9; color: #2e7d32; }
+.st-abg { background: #f3e5f5; color: #6a1b9a; }
+.card-name { font-size: 14px; font-weight: 600; flex: 1; }
+.card-meta { display: flex; gap: 14px; flex-shrink: 0; }
+.chip { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+.chevron { font-size: 12px; color: var(--muted); transition: transform 0.2s; margin-left: 4px; }
+.card.open .chevron { transform: rotate(180deg); }
+.rev-badge { display: inline-flex; align-items: center; background: #fff3e0; color: #e65100; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-family: 'DM Mono', monospace; font-weight: 500; margin-left: 6px; }
+
+.card-body { display: none; border-top: 1px solid var(--border); padding: 18px; background: var(--ice2); }
+.card.open .card-body { display: block; }
+
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.dsec { background: white; border-radius: 8px; padding: 14px; border: 1px solid var(--border); }
+.dsec-title { font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+.io-item { padding: 7px 0; border-bottom: 1px solid var(--ice); }
+.io-item:last-child { border-bottom: none; }
+.io-name { font-size: 13px; font-weight: 500; }
+.io-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+.io-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+.hr { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--ice); }
+.hr:last-child { border-bottom: none; }
+.hr-label { font-size: 12px; color: var(--muted); }
+.hr-val { font-size: 13px; font-weight: 600; font-family: 'DM Mono', monospace; }
+.hr-val.over { color: var(--coral); }
+.pbar { height: 4px; background: var(--ice); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.pfill { height: 100%; background: var(--teal); border-radius: 2px; }
+.pfill.over { background: var(--coral); }
+
+.rev-hist { background: white; border-radius: 8px; padding: 12px 14px; margin-top: 12px; border: 1px solid var(--border); }
+.rev-hist-title { font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+.rev-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--ice); font-size: 12px; flex-wrap: wrap; }
+.rev-row:last-child { border-bottom: none; }
+.rev-ver { font-family: 'DM Mono', monospace; font-weight: 600; color: var(--navy); min-width: 24px; }
+.rev-ver.arc { color: var(--muted); }
+.rev-grund { color: var(--amber); font-size: 11px; font-style: italic; }
+
+.actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.btn-sm { padding: 8px 14px; border-radius: 7px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); background: white; color: var(--navy); transition: all 0.15s; }
+.btn-sm:hover { background: var(--navy); color: white; border-color: var(--navy); }
+.btn-del { border-color: #ffcdd2; background: #fff5f5; color: var(--coral); }
+.btn-del:hover { background: var(--coral); color: white; border-color: var(--coral); }
+.btn-rev { border: 1px solid var(--amber); background: #fff8e1; color: #b36a00; padding: 8px 14px; border-radius: 7px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.btn-rev:hover { background: var(--amber); color: white; }
+.st-sel { padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--navy); background: white; cursor: pointer; }
+
+/* MODAL */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(26,35,66,0.55); z-index: 200; align-items: center; justify-content: center; }
+.overlay.open { display: flex; }
+.modal { background: white; border-radius: 14px; padding: 26px; width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(26,35,66,0.25); }
+.modal-title { font-size: 16px; font-weight: 600; color: var(--navy); margin-bottom: 18px; }
+.fg { margin-bottom: 12px; }
+.fl { font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 4px; display: block; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.fi, .fsel, .fta { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--navy); background: var(--ice2); outline: none; }
+.fi:focus, .fsel:focus, .fta:focus { border-color: var(--teal); background: white; }
+.fta { min-height: 70px; resize: vertical; }
+.frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.btn-cancel { padding: 9px 16px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--muted); font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.btn-save { padding: 9px 20px; border: none; border-radius: 8px; background: var(--teal); color: white; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+.io-sec { background: var(--ice2); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.io-sec-title { font-size: 11px; font-weight: 600; color: var(--navy); margin-bottom: 8px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+.io-entry { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; margin-bottom: 6px; align-items: end; }
+.io-rm { padding: 9px 8px; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 16px; border-radius: 6px; }
+.io-rm:hover { color: var(--coral); background: #fff0ee; }
+.add-io { font-size: 12px; color: var(--teal); background: none; border: none; cursor: pointer; padding: 3px 0; font-family: 'DM Sans', sans-serif; }
+
+/* DRAWER */
+.drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; }
+.drawer-overlay.open { display: block; }
+.drawer { position: fixed; top: 0; left: -270px; width: 250px; height: 100vh; background: var(--navy2); z-index: 160; transition: left 0.25s ease; padding: 50px 0 20px; overflow-y: auto; }
+.drawer.open { left: 0; }
+.drawer-close { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.1); border: none; border-radius: 6px; color: white; font-size: 16px; width: 30px; height: 30px; cursor: pointer; }
+
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-icon { font-size: 44px; margin-bottom: 14px; }
+.empty-title { font-size: 15px; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
+
+@media (max-width: 680px) {
+  .sidebar { display: none; }
+  .hamburger { display: flex; align-items: center; justify-content: center; }
+  .search-box { width: 120px; font-size: 12px; }
+  .main { padding: 14px; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .stats-bar { flex-wrap: wrap; gap: 8px; }
+  .stat-card { min-width: calc(50% - 4px); flex: none; padding: 10px 12px; }
+  .proj-header { flex-direction: column; gap: 10px; }
+  .btn-primary { width: 100%; text-align: center; }
+  .card-meta { display: none; }
+  .frow { grid-template-columns: 1fr; }
+  .io-entry { grid-template-columns: 1fr 1fr; }
+  .io-entry > div:nth-child(3) { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="hamburger" id="hamburgerBtn">☰</button>
+    <div class="topbar-title">◆ <span>Projekt</span>tracker</div>
+  </div>
+  <div class="topbar-right">
+    <input class="search-box" id="searchBox" placeholder="Suchen…" oninput="doSearch(this.value)">
+    <button id="adminBtn" onclick="toggleAdmin()" style="background:rgba(255,255,255,0.1);border:none;border-radius:8px;color:rgba(255,255,255,0.7);font-size:12px;padding:6px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">🔐 Admin</button>
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="btnDE" onclick="setLang('de')">DE</button>
+      <button class="lang-btn" id="btnEN" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="drawer">
+  <button class="drawer-close" id="drawerClose">✕</button>
+  <div class="sidebar-label">Projekte</div>
+  <div id="drawerList"></div>
+  <button class="add-proj-btn" id="drawerAddBtn">+ Projekt hinzufügen</button>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-label">Projekte</div>
+    <div id="sidebarList"></div>
+    <button class="add-proj-btn" id="sidebarAddBtn">+ Projekt hinzufügen</button>
+  </div>
+  <div class="main">
+    <div id="noProj" class="empty" style="display:none">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title" id="noProjTitle">Kein Projekt ausgewählt</div>
+    </div>
+    <div id="projView"></div>
+  </div>
+</div>
+
+<!-- MODAL: PROJEKT -->
+<div class="overlay" id="modalProj">
+  <div class="modal">
+    <div class="modal-title" id="modalProjTitle">Neues Projekt</div>
+    <div class="fg"><label class="fl" id="lProjName">Projektname</label><input class="fi" id="fProjName" placeholder="z.B. KES-2024-07"></div>
+    <div class="fg"><label class="fl" id="lProjDesc">Beschreibung</label><input class="fi" id="fProjDesc" placeholder="z.B. Kesselgewichtsberechnung"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl" id="lProjOwner">Verantwortlich</label><input class="fi" id="fProjOwner" placeholder="Name"></div>
+      <div class="fg"><label class="fl" id="lProjDeadline">Endtermin</label><input class="fi" type="date" id="fProjDeadline"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelProj">Abbrechen</button>
+      <button class="btn-save" id="saveProj">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: AUFGABE -->
+<div class="overlay" id="modalAufg">
+  <div class="modal">
+    <div class="modal-title" id="modalAufgTitle">Neue Aufgabe</div>
+    <div class="fg"><label class="fl" id="lAName">Aufgabenname</label><input class="fi" id="fAName" placeholder="z.B. Statikberechnung"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl" id="lAOwner">Verantwortlich</label><input class="fi" id="fAOwner" placeholder="Name"></div>
+      <div class="fg"><label class="fl" id="lADept">Abteilung</label><input class="fi" id="fADept" placeholder="z.B. Statik"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl" id="lASoll">Soll-Stunden</label><input class="fi" type="number" id="fASoll" placeholder="0"></div>
+      <div class="fg"><label class="fl" id="lAIst">Ist-Stunden</label><input class="fi" type="number" id="fAIst" placeholder="0"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl" id="lATermin">Fälligkeitsdatum</label><input class="fi" type="date" id="fATermin"></div>
+      <div class="fg"><label class="fl" id="lAStatus">Status</label>
+        <select class="fsel" id="fAStatus">
+          <option value="Offen">Offen</option>
+          <option value="In Bearbeitung">In Bearbeitung</option>
+          <option value="In Prüfung">In Prüfung</option>
+          <option value="Freigegeben">Freigegeben</option>
+          <option value="Abgeschlossen">Abgeschlossen</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label class="fl" id="lAAbh">Abhängigkeit (benötigt)</label><input class="fi" id="fAAbh" placeholder="z.B. Druckberechnung abgeschlossen"></div>
+    <div class="fg"><label class="fl" id="lANotes">Notizen</label><textarea class="fta" id="fANotes"></textarea></div>
+    <div class="io-sec">
+      <div class="io-sec-title" id="ioInTitle">📥 Eingangsdaten (Inputs)</div>
+      <div id="inputList"></div>
+      <button class="add-io" id="addInputBtn">+ Input hinzufügen</button>
+    </div>
+    <div class="io-sec">
+      <div class="io-sec-title" id="ioOutTitle">📤 Ausgangsdaten (Outputs)</div>
+      <div id="outputList"></div>
+      <button class="add-io" id="addOutputBtn">+ Output hinzufügen</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelAufg">Abbrechen</button>
+      <button class="btn-save" id="saveAufg">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADMIN LOGIN -->
+<div class="overlay" id="modalAdmin">
+  <div class="modal" style="max-width:340px">
+    <div class="modal-title">🔐 Admin-Anmeldung</div>
+    <div class="fg"><label class="fl">Passwort</label><input class="fi" type="password" id="fAdminPw" placeholder="••••••••"></div>
+    <div id="adminErr" style="color:var(--coral);font-size:12px;margin-top:-6px;margin-bottom:8px;display:none">Falsches Passwort.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modalAdmin')">Abbrechen</button>
+      <button class="btn-save" onclick="doAdminLogin()">Anmelden</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: REVISION -->
+<div class="overlay" id="modalRev">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-title" id="modalRevTitle">🔄 Revision erstellen</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px" id="revDesc">Die aktuelle Version wird archiviert. Neue Version startet mit "In Bearbeitung".</div>
+    <div class="fg"><label class="fl" id="lRevGrund">Revisionsgrund</label><input class="fi" id="fRevGrund" placeholder="z.B. Kunde hat Geometrie geändert"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl" id="lRevTermin">Neues Fälligkeitsdatum</label><input class="fi" type="date" id="fRevTermin"></div>
+      <div class="fg"><label class="fl" id="lRevSoll">Neue Soll-Stunden</label><input class="fi" type="number" id="fRevSoll" placeholder="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelRev">Abbrechen</button>
+      <button class="btn-save" id="saveRev" style="background:var(--amber)">Revision starten</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var lang = 'de';
+var projects = [];
+var activeProjId = null;
+var editAufgId = null;
+var revTargetId = null;
+var activeFilter = 'all';
+var currentUser = null; // null = eingeloggt als normaler Nutzer, 'admin' = Admin
+var ADMIN_PW = 'Serhat1133.';
+var viewRevAufgId = null; // hangi görevin revizyonu görüntüleniyor
+
+var TR = {
+  de: {
+    projekte: 'Projekte', addProj: '+ Projekt hinzufügen', neuesProj: 'Neues Projekt',
+    projName: 'Projektname', beschr: 'Beschreibung', verantw: 'Verantwortlich',
+    endtermin: 'Endtermin', abbrechen: 'Abbrechen', speichern: 'Speichern',
+    keineProj: 'Kein Projekt ausgewählt', addAufg: '+ Aufgabe hinzufügen',
+    aufgName: 'Aufgabenname', abteilung: 'Abteilung', sollStd: 'Soll-Stunden',
+    istStd: 'Ist-Stunden', faellig: 'Fälligkeitsdatum', status: 'Status',
+    abh: 'Abhängigkeit (benötigt)', notizen: 'Notizen',
+    inputs: '📥 Eingangsdaten (Inputs)', outputs: '📤 Ausgangsdaten (Outputs)',
+    addInput: '+ Input hinzufügen', addOutput: '+ Output hinzufügen',
+    neueAufg: 'Neue Aufgabe', bearbAufg: 'Aufgabe bearbeiten',
+    alle: 'Alle', gesamt: 'Aufgaben gesamt', abgeschl: 'abgeschlossen',
+    inBearb: 'In Bearbeitung', aktivAufg: 'aktive Aufgaben',
+    sollGes: 'Soll-Stunden', geplant: 'geplant', istGes: 'Ist-Stunden', verbraucht: 'verbraucht',
+    eingangsd: 'Eingangsdaten', ausgangsd: 'Ausgangsdaten', stundenInfo: 'Stunden & Info',
+    soll: 'Soll', ist: 'Ist', dept: 'Abteilung', benoetigt: 'Benötigt',
+    von: 'Von', an: 'An', dateiname: 'Dateiname', abtDatum: 'Abt. · Datum',
+    bearbeiten: '✏ Bearbeiten', loeschen: '🗑 Löschen', revision: '🔄 Revision',
+    revTitel: '🔄 Revision erstellen', revDesc: 'Die aktuelle Version wird archiviert. Neue Version startet mit "In Bearbeitung".',
+    revGrund: 'Revisionsgrund', neuTermin: 'Neues Fälligkeitsdatum', neuSoll: 'Neue Soll-Stunden',
+    revStarten: 'Revision starten', versHist: 'Versionshistorie', aktiv: '← aktiv',
+    loeschenFrage: 'Aufgabe wirklich löschen?', keineInputs: 'Keine Inputs', keineOutputs: 'Keine Outputs',
+    suchen: 'Suchen…', endterminLabel: 'Endtermin', verantwLabel: 'Verantwortlich',
+    adminLogin: '🔐 Admin-Anmeldung', adminPw: 'Admin-Passwort', adminFalsch: 'Falsches Passwort.',
+    adminAb: 'Admin abmelden', revLoeschen: '🗑 Rev. löschen', revLoeschFrage: 'Diese Revision wirklich löschen?',
+    nurAktiv: 'Nur aktive Revision bearbeitbar.', aufgLoeschFrage: 'Gesamte Aufgabe löschen?',
+    revDetail: 'Versionsdetails', loginBtn: 'Anmelden'
+  },
+  en: {
+    projekte: 'Projects', addProj: '+ Add project', neuesProj: 'New Project',
+    projName: 'Project name', beschr: 'Description', verantw: 'Responsible',
+    endtermin: 'End date', abbrechen: 'Cancel', speichern: 'Save',
+    keineProj: 'No project selected', addAufg: '+ Add task',
+    aufgName: 'Task name', abteilung: 'Department', sollStd: 'Planned hours',
+    istStd: 'Actual hours', faellig: 'Due date', status: 'Status',
+    abh: 'Dependency (requires)', notizen: 'Notes',
+    inputs: '📥 Input data', outputs: '📤 Output data',
+    addInput: '+ Add input', addOutput: '+ Add output',
+    neueAufg: 'New task', bearbAufg: 'Edit task',
+    alle: 'All', gesamt: 'Total tasks', abgeschl: 'done',
+    inBearb: 'In Progress', aktivAufg: 'active tasks',
+    sollGes: 'Planned hours', geplant: 'planned', istGes: 'Actual hours', verbraucht: 'used',
+    eingangsd: 'Inputs', ausgangsd: 'Outputs', stundenInfo: 'Hours & Info',
+    soll: 'Planned', ist: 'Actual', dept: 'Department', benoetigt: 'Requires',
+    von: 'From', an: 'To', dateiname: 'Filename', abtDatum: 'Dept. · Date',
+    bearbeiten: '✏ Edit', loeschen: '🗑 Delete', revision: '🔄 Revision',
+    revTitel: '🔄 Create revision', revDesc: 'Current version will be archived. New version starts with "In Bearbeitung".',
+    revGrund: 'Reason for revision', neuTermin: 'New due date', neuSoll: 'New planned hours',
+    revStarten: 'Start revision', versHist: 'Version history', aktiv: '← active',
+    loeschenFrage: 'Delete this task?', keineInputs: 'No inputs', keineOutputs: 'No outputs',
+    suchen: 'Search…', endterminLabel: 'Deadline', verantwLabel: 'Responsible',
+    adminLogin: '🔐 Admin login', adminPw: 'Admin password', adminFalsch: 'Wrong password.',
+    adminAb: 'Logout admin', revLoeschen: '🗑 Del. rev.', revLoeschFrage: 'Delete this revision?',
+    nurAktiv: 'Only active revision can be edited.', aufgLoeschFrage: 'Delete entire task?',
+    revDetail: 'Version details', loginBtn: 'Login'
+  }
+};
+
+function T(k) { return TR[lang][k] || k; }
+
+// ── DATA ──────────────────────────────────────────
+function load() {
+  try { projects = JSON.parse(localStorage.getItem('pt2') || '[]'); } catch(e) { projects = []; }
+  if (projects.length === 0) {
+    projects = [{
+      id: 'p1', name: 'KES-2024-07', desc: 'Kesselgewichtsberechnung',
+      owner: 'K. Yılmaz', deadline: '2026-06-10', color: '#00897b',
+      aufgaben: [
+        { id: 'a1', name: 'Druckberechnung bereitstellen', owner: 'M. Weber', dept: 'Konstruktion', abh: '',
+          versionen: [{ ver:1, status:'Abgeschlossen', soll:8, ist:6, termin:'2026-06-02', notes:'Sammler-Abmessungen notwendig.', grund:'', inputs:[], outputs:[{name:'Druckberechnung_v1.pdf', von:'M. Weber', abt:'Konstruktion', datum:'2026-06-02', ziel:'K. Yılmaz'}] }] },
+        { id: 'a2', name: 'Wandstärke Sammler bestimmen', owner: 'K. Yılmaz', dept: 'Statik & Festigkeit', abh: 'Druckberechnung abgeschlossen',
+          versionen: [{ ver:1, status:'In Bearbeitung', soll:4, ist:4, termin:'2026-06-04', notes:'', grund:'', inputs:[{name:'Druckberechnung_v1.pdf', von:'M. Weber', abt:'Konstruktion', datum:'2026-06-02'}], outputs:[] }] },
+        { id: 'a3', name: 'Statikberechnung (Grundgeometrie)', owner: 'K. Yılmaz', dept: 'Statik & Festigkeit', abh: 'Geometrie vom Auftraggeber',
+          versionen: [{ ver:1, status:'Offen', soll:12, ist:0, termin:'2026-06-06', notes:'', grund:'', inputs:[], outputs:[{name:'Statikbericht_KES2024.pdf', von:'K. Yılmaz', abt:'Statik', datum:'', ziel:'Konstruktion'}] }] },
+        { id: 'a4', name: 'Prüfung Wandstärke', owner: 'T. Müller', dept: 'Prüfung', abh: 'Wandstärke abgeschlossen',
+          versionen: [{ ver:1, status:'Offen', soll:2, ist:0, termin:'2026-06-05', notes:'', grund:'', inputs:[], outputs:[] }] },
+        { id: 'a5', name: 'Freigabe durch Projektleiter', owner: 'Hr. Schmidt', dept: 'Projektleitung', abh: 'Beide Prüfungen abgeschlossen',
+          versionen: [{ ver:1, status:'Offen', soll:1, ist:0, termin:'2026-06-08', notes:'', grund:'', inputs:[], outputs:[] }] }
+      ]
+    }];
+    save();
+    activeProjId = 'p1';
+  }
+}
+
+function save() { localStorage.setItem('pt2', JSON.stringify(projects)); }
+function getProj(id) { return projects.find(function(p){ return p.id === id; }); }
+function getActive() { return getProj(activeProjId); }
+function aktV(a) { return a.versionen[a.versionen.length - 1]; }
+
+function statusClass(st) {
+  return { 'Offen':'st-offen', 'In Bearbeitung':'st-inb', 'In Prüfung':'st-prue', 'Freigegeben':'st-frei', 'Abgeschlossen':'st-abg' }[st] || 'st-offen';
+}
+
+// ── LANG ─────────────────────────────────────────
+function setLang(l) {
+  lang = l;
+  document.getElementById('btnDE').classList.toggle('active', l === 'de');
+  document.getElementById('btnEN').classList.toggle('active', l === 'en');
+  updateLangTexts();
+  render();
+}
+
+function updateLangTexts() {
+  document.getElementById('searchBox').placeholder = T('suchen');
+  document.getElementById('sidebarAddBtn').textContent = T('addProj');
+  document.getElementById('drawerAddBtn').textContent = T('addProj');
+  document.getElementById('modalProjTitle').textContent = T('neuesProj');
+  document.getElementById('lProjName').textContent = T('projName');
+  document.getElementById('lProjDesc').textContent = T('beschr');
+  document.getElementById('lProjOwner').textContent = T('verantw');
+  document.getElementById('lProjDeadline').textContent = T('endtermin');
+  document.getElementById('cancelProj').textContent = T('abbrechen');
+  document.getElementById('saveProj').textContent = T('speichern');
+  document.getElementById('lAName').textContent = T('aufgName');
+  document.getElementById('lAOwner').textContent = T('verantw');
+  document.getElementById('lADept').textContent = T('abteilung');
+  document.getElementById('lASoll').textContent = T('sollStd');
+  document.getElementById('lAIst').textContent = T('istStd');
+  document.getElementById('lATermin').textContent = T('faellig');
+  document.getElementById('lAStatus').textContent = T('status');
+  document.getElementById('lAAbh').textContent = T('abh');
+  document.getElementById('lANotes').textContent = T('notizen');
+  document.getElementById('ioInTitle').textContent = T('inputs');
+  document.getElementById('ioOutTitle').textContent = T('outputs');
+  document.getElementById('addInputBtn').textContent = T('addInput');
+  document.getElementById('addOutputBtn').textContent = T('addOutput');
+  document.getElementById('cancelAufg').textContent = T('abbrechen');
+  document.getElementById('saveAufg').textContent = T('speichern');
+  document.getElementById('modalRevTitle').textContent = T('revTitel');
+  document.getElementById('revDesc').textContent = T('revDesc');
+  document.getElementById('lRevGrund').textContent = T('revGrund');
+  document.getElementById('lRevTermin').textContent = T('neuTermin');
+  document.getElementById('lRevSoll').textContent = T('neuSoll');
+  document.getElementById('cancelRev').textContent = T('abbrechen');
+  document.getElementById('saveRev').textContent = T('revStarten');
+}
+
+// ── RENDER ───────────────────────────────────────
+function render() {
+  renderSidebar('sidebarList');
+  renderSidebar('drawerList');
+  if (activeProjId) {
+    document.getElementById('noProj').style.display = 'none';
+    document.getElementById('projView').style.display = 'block';
+    renderProject();
+  } else {
+    document.getElementById('noProj').style.display = 'block';
+    document.getElementById('noProjTitle').textContent = T('keineProj');
+    document.getElementById('projView').style.display = 'none';
+  }
+}
+
+function renderSidebar(listId) {
+  var el = document.getElementById(listId);
+  el.innerHTML = '';
+  var colors = ['#00897b','#1565c0','#6a1b9a','#c0392b','#e65c00'];
+  projects.forEach(function(p, i) {
+    var total = p.aufgaben.length;
+    var done = p.aufgaben.filter(function(a){ return aktV(a).status === 'Abgeschlossen'; }).length;
+    var div = document.createElement('div');
+    div.className = 'proj-item' + (p.id === activeProjId ? ' active' : '');
+    div.innerHTML = '<div class="proj-dot" style="background:'+colors[i%colors.length]+'"></div><div class="proj-name">'+p.name+'</div><div class="proj-count">'+done+'/'+total+'</div>';
+    div.addEventListener('click', function(){ activeProjId = p.id; activeFilter = 'all'; closeDrawer(); render(); });
+    el.appendChild(div);
+  });
+}
+
+function renderProject() {
+  var p = getActive();
+  if (!p) return;
+  var totalSoll = p.aufgaben.reduce(function(s,a){ return s + (aktV(a).soll||0); }, 0);
+  var totalIst = p.aufgaben.reduce(function(s,a){ return s + (aktV(a).ist||0); }, 0);
+  var done = p.aufgaben.filter(function(a){ return aktV(a).status === 'Abgeschlossen'; }).length;
+  var inb = p.aufgaben.filter(function(a){ return aktV(a).status === 'In Bearbeitung'; }).length;
+  var pct = totalSoll > 0 ? Math.round(totalIst/totalSoll*100) : 0;
+
+  var html = '<div class="proj-header">'
+    + '<div><div class="proj-title">'+p.name+' <span style="font-size:14px;color:var(--muted);font-weight:400">— '+p.desc+'</span></div>'
+    + '<div class="proj-meta">'+T('verantwLabel')+': '+p.owner+' · '+T('endterminLabel')+': '+p.deadline+'</div></div>'
+    + '<button class="btn-primary" id="addAufgBtn">'+T('addAufg')+'</button></div>'
+    + '<div class="stats-bar">'
+    + '<div class="stat-card"><div class="stat-label">'+T('gesamt')+'</div><div class="stat-value">'+p.aufgaben.length+'</div><div class="stat-sub">'+done+' '+T('abgeschl')+'</div></div>'
+    + '<div class="stat-card"><div class="stat-label">'+T('inBearb')+'</div><div class="stat-value" style="color:var(--teal)">'+inb+'</div><div class="stat-sub">'+T('aktivAufg')+'</div></div>'
+    + '<div class="stat-card"><div class="stat-label">'+T('sollGes')+'</div><div class="stat-value">'+totalSoll+'h</div><div class="stat-sub">'+T('geplant')+'</div></div>'
+    + '<div class="stat-card"><div class="stat-label">'+T('istGes')+'</div><div class="stat-value" style="color:'+(totalIst>totalSoll?'var(--coral)':'var(--navy)')+'">'+totalIst+'h</div><div class="stat-sub">'+pct+'% '+T('verbraucht')+'</div></div>'
+    + '</div>'
+    + '<div class="filter-bar">'
+    + ['all','Offen','In Bearbeitung','In Prüfung','Freigegeben','Abgeschlossen'].map(function(f){
+        var label = f === 'all' ? T('alle') : f;
+        return '<button class="filter-btn'+(activeFilter===f?' active':'')+'" data-filter="'+f+'">'+label+'</button>';
+      }).join('')
+    + '</div>'
+    + '<div id="cardList">'
+    + p.aufgaben.map(function(a){ return renderCard(a); }).join('')
+    + '</div>';
+
+  document.getElementById('projView').innerHTML = html;
+
+  document.getElementById('addAufgBtn').addEventListener('click', function(){ openAufgModal(null); });
+
+  document.querySelectorAll('.filter-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      activeFilter = btn.dataset.filter;
+      render();
+    });
+  });
+
+  document.querySelectorAll('.card-header').forEach(function(h){
+    h.addEventListener('click', function(){ toggleCard(h.dataset.id); });
+  });
+
+  document.querySelectorAll('.st-sel').forEach(function(sel){
+    sel.addEventListener('change', function(){ quickStatus(sel.dataset.id, sel.value); });
+  });
+
+  document.querySelectorAll('.btn-edit').forEach(function(btn){
+    btn.addEventListener('click', function(e){ e.stopPropagation(); openAufgModal(btn.dataset.id); });
+  });
+
+  // Aktif revizyonu sil
+  document.querySelectorAll('.btn-del-aktiv').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var p = getActive();
+      var a = p.aufgaben.find(function(x){ return x.id === btn.dataset.id; });
+      if (!a || a.versionen.length <= 1) { alert(T('nurAktiv')); return; }
+      if (!confirm(T('revLoeschFrage'))) return;
+      a.versionen.pop();
+      save(); render();
+    });
+  });
+
+  // Arşiv revizyonunu sil (sadece admin)
+  document.querySelectorAll('.btn-del-rev').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if (currentUser !== 'admin') return;
+      if (!confirm(T('revLoeschFrage'))) return;
+      var p = getActive();
+      var a = p.aufgaben.find(function(x){ return x.id === btn.dataset.aid; });
+      if (!a) return;
+      var ver = parseInt(btn.dataset.ver);
+      a.versionen = a.versionen.filter(function(vv){ return vv.ver !== ver; });
+      // Versiyon numaralarını düzelt
+      a.versionen.forEach(function(vv, i){ vv.ver = i+1; });
+      save(); render();
+    });
+  });
+
+  // Tüm görevi sil (sadece admin)
+  document.querySelectorAll('.btn-del-all').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if (currentUser !== 'admin') return;
+      if (!confirm(T('aufgLoeschFrage'))) return;
+      var p = getActive();
+      p.aufgaben = p.aufgaben.filter(function(a){ return a.id !== btn.dataset.id; });
+      save(); render();
+    });
+  });
+
+  // Arşiv revizyonu tıklanınca detay aç/kapat
+  document.querySelectorAll('[data-rev-view]').forEach(function(row){
+    row.addEventListener('click', function(e){
+      if (e.target.classList.contains('btn-del-rev')) return;
+      var key = row.dataset.revView;
+      var detail = document.getElementById('revd-'+key);
+      if (detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+
+  document.querySelectorAll('.btn-rev').forEach(function(btn){
+    btn.addEventListener('click', function(e){ e.stopPropagation(); openRevModal(btn.dataset.id); });
+  });
+
+  applyFilter();
+}
+
+function renderCard(a) {
+  var v = aktV(a);
+  var vers = a.versionen;
+  var verNum = vers.length;
+  var sc = statusClass(v.status);
+  var pct = v.soll > 0 ? Math.min(Math.round((v.ist||0)/v.soll*100),100) : 0;
+  var over = (v.ist||0) > (v.soll||0);
+
+  var inputsHtml = (v.inputs||[]).length === 0
+    ? '<div class="io-empty">'+T('keineInputs')+'</div>'
+    : v.inputs.map(function(i){ return '<div class="io-item"><div class="io-name">📄 '+i.name+'</div><div class="io-meta">'+T('von')+': '+i.von+' · '+i.abt+' · '+(i.datum||'—')+'</div></div>'; }).join('');
+
+  var outputsHtml = (v.outputs||[]).length === 0
+    ? '<div class="io-empty">'+T('keineOutputs')+'</div>'
+    : v.outputs.map(function(o){ return '<div class="io-item"><div class="io-name">📤 '+o.name+'</div><div class="io-meta">'+T('an')+': '+(o.ziel||'—')+' · '+(o.datum||'—')+'</div></div>'; }).join('');
+
+  var archiv = vers.slice(0, -1);
+  var revHistHtml = '<div class="rev-hist"><div class="rev-hist-title">📋 '+T('versHist')+'</div>'
+    + archiv.map(function(vv){
+        var canDelRev = currentUser === 'admin';
+        return '<div class="rev-row" style="cursor:pointer" data-rev-view="'+a.id+'-'+vv.ver+'">'
+          + '<span class="rev-ver arc">v'+vv.ver+'</span>'
+          + '<span><span class="pill '+statusClass(vv.status)+'" style="font-size:10px">'+vv.status+'</span></span>'
+          + '<span style="color:var(--muted);font-family:\'DM Mono\',monospace;font-size:11px">'+(vv.termin||'—')+'</span>'
+          + (vv.grund?'<span class="rev-grund">↳ '+vv.grund+'</span>':'')
+          + (canDelRev?'<button class="btn-sm btn-del-rev" style="padding:3px 8px;font-size:10px;margin-left:auto" data-aid="'+a.id+'" data-ver="'+vv.ver+'">×</button>':'')
+          + '</div>'
+          + '<div class="rev-detail" id="revd-'+a.id+'-'+vv.ver+'" style="display:none;background:var(--ice2);border-radius:6px;padding:10px;margin:4px 0 8px;font-size:12px">'
+          + '<b>Inputs:</b> '+(vv.inputs&&vv.inputs.length?vv.inputs.map(function(i){return i.name+' ('+i.von+')'}).join(', '):'—')+'<br>'
+          + '<b>Outputs:</b> '+(vv.outputs&&vv.outputs.length?vv.outputs.map(function(o){return o.name+' → '+(o.ziel||'—')}).join(', '):'—')+'<br>'
+          + '<b>Soll/Ist:</b> '+(vv.soll||0)+'h / '+(vv.ist||0)+'h'
+          + (vv.notes?'<br><i>'+vv.notes+'</i>':'')
+          + '</div>';
+      }).join('')
+    + '<div class="rev-row"><span class="rev-ver" style="color:var(--teal)">v'+verNum+'</span>'
+    + '<span><span class="pill '+sc+'" style="font-size:10px">'+v.status+'</span></span>'
+    + '<span style="color:var(--muted);font-family:\'DM Mono\',monospace;font-size:11px">'+(v.termin||'—')+'</span>'
+    + '<span style="font-size:10px;color:var(--teal);font-family:\'DM Mono\',monospace">'+T('aktiv')+'</span></div>'
+    + '</div>';
+
+  var visible = (activeFilter === 'all' || v.status === activeFilter);
+
+  return '<div class="card" data-st="'+v.status+'" data-aid="'+a.id+'" style="'+(visible?'':'display:none')+'">'
+    + '<div class="card-header" data-id="'+a.id+'">'
+    + '<span class="pill '+sc+'">'+v.status+'</span>'
+    + '<div class="card-name">'+a.name+(verNum>1?'<span class="rev-badge">v'+verNum+'</span>':'')+'</div>'
+    + '<div class="card-meta"><span class="chip">👤 '+a.owner+'</span><span class="chip">⏱ '+(v.ist||0)+'/'+(v.soll||0)+'h</span><span class="chip">📅 '+(v.termin||'—')+'</span></div>'
+    + '<span class="chevron">▾</span></div>'
+    + '<div class="card-body">'
+    + '<div class="detail-grid">'
+    + '<div class="dsec"><div class="dsec-title">'+T('eingangsd')+'</div>'+inputsHtml+'</div>'
+    + '<div class="dsec"><div class="dsec-title">'+T('ausgangsd')+'</div>'+outputsHtml+'</div>'
+    + '<div class="dsec"><div class="dsec-title">'+T('stundenInfo')+'</div>'
+    + '<div class="hr"><span class="hr-label">'+T('soll')+'</span><span class="hr-val">'+(v.soll||0)+'h</span></div>'
+    + '<div class="hr"><span class="hr-label">'+T('ist')+'</span><span class="hr-val'+(over?' over':'')+'"><b>'+(v.ist||0)+'h</b></span></div>'
+    + '<div class="pbar"><div class="pfill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>'
+    + (a.dept?'<div class="hr" style="margin-top:8px"><span class="hr-label">'+T('dept')+'</span><span class="hr-val" style="font-size:11px;font-weight:400">'+a.dept+'</span></div>':'')
+    + (a.abh?'<div class="hr"><span class="hr-label">'+T('benoetigt')+'</span><span class="hr-val" style="font-size:11px;font-weight:400;color:var(--amber)">⚠ '+a.abh+'</span></div>':'')
+    + (v.notes?'<div style="margin-top:8px;font-size:12px;color:var(--muted);font-style:italic">'+v.notes+'</div>':'')
+    + '</div></div>'
+    + revHistHtml
+    + '<div class="actions">'
+    + '<select class="st-sel" data-id="'+a.id+'">'
+    + ['Offen','In Bearbeitung','In Prüfung','Freigegeben','Abgeschlossen'].map(function(s){ return '<option value="'+s+'"'+(s===v.status?' selected':'')+'>'+s+'</option>'; }).join('')
+    + '</select>'
+    + '<button class="btn-sm btn-edit" data-id="'+a.id+'">'+T('bearbeiten')+'</button>'
+    + '<button class="btn-rev" data-id="'+a.id+'">'+T('revision')+'</button>'
+    + (verNum > 1 ? '<button class="btn-sm btn-del-aktiv" data-id="'+a.id+'" style="border-color:#ffcdd2;background:#fff5f5;color:var(--coral)">🗑 Rev. v'+verNum+' löschen</button>' : '')
+    + (currentUser === 'admin' ? '<button class="btn-sm btn-del-all" data-id="'+a.id+'" style="border-color:#b71c1c;background:#ffebee;color:#b71c1c">🗑 Aufgabe löschen</button>' : '')
+    + '</div></div></div>';
+}
+
+function toggleCard(id) {
+  var card = document.querySelector('.card[data-aid="'+id+'"]');
+  if (card) card.classList.toggle('open');
+}
+
+function applyFilter() {
+  document.querySelectorAll('.card').forEach(function(c){
+    var st = c.dataset.st;
+    c.style.display = (activeFilter === 'all' || st === activeFilter) ? 'block' : 'none';
+  });
+}
+
+function doSearch(val) {
+  var q = val.toLowerCase();
+  document.querySelectorAll('.card').forEach(function(c){
+    var name = c.querySelector('.card-name') ? c.querySelector('.card-name').textContent.toLowerCase() : '';
+    c.style.display = name.includes(q) ? 'block' : 'none';
+  });
+}
+
+function quickStatus(id, status) {
+  var p = getActive();
+  var a = p.aufgaben.find(function(x){ return x.id === id; });
+  if (!a) return;
+  aktV(a).status = status;
+  save();
+  render();
+}
+
+function doDelete(id) {
+  if (!confirm(T('loeschenFrage'))) return;
+  var p = getActive();
+  p.aufgaben = p.aufgaben.filter(function(a){ return a.id !== id; });
+  save();
+  render();
+}
+
+function toggleAdmin() {
+  if (currentUser === 'admin') {
+    currentUser = null;
+    document.getElementById('adminBtn').textContent = '🔐 Admin';
+    document.getElementById('adminBtn').style.background = 'rgba(255,255,255,0.1)';
+    render();
+  } else {
+    document.getElementById('fAdminPw').value = '';
+    document.getElementById('adminErr').style.display = 'none';
+    document.getElementById('modalAdmin').classList.add('open');
+    setTimeout(function(){ document.getElementById('fAdminPw').focus(); }, 100);
+  }
+}
+
+function doAdminLogin() {
+  var pw = document.getElementById('fAdminPw').value;
+  if (pw === ADMIN_PW) {
+    currentUser = 'admin';
+    document.getElementById('adminBtn').textContent = '✓ Admin';
+    document.getElementById('adminBtn').style.background = 'var(--teal)';
+    closeModal('modalAdmin');
+    render();
+  } else {
+    document.getElementById('adminErr').style.display = 'block';
+  }
+}
+
+document.getElementById('fAdminPw').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') doAdminLogin();
+});
+
+// ── PROJE MODAL ──────────────────────────────────
+function openProjModal() {
+  document.getElementById('fProjName').value = '';
+  document.getElementById('fProjDesc').value = '';
+  document.getElementById('fProjOwner').value = '';
+  document.getElementById('fProjDeadline').value = '';
+  document.getElementById('modalProj').classList.add('open');
+}
+
+document.getElementById('saveProj').addEventListener('click', function(){
+  var name = document.getElementById('fProjName').value.trim();
+  if (!name) return;
+  var colors = ['#00897b','#1565c0','#6a1b9a','#c0392b','#e65c00'];
+  var p = { id: 'p'+Date.now(), name: name, desc: document.getElementById('fProjDesc').value.trim(),
+    owner: document.getElementById('fProjOwner').value.trim(), deadline: document.getElementById('fProjDeadline').value,
+    color: colors[projects.length % colors.length], aufgaben: [] };
+  projects.push(p);
+  activeProjId = p.id;
+  save();
+  closeModal('modalProj');
+  render();
+});
+
+document.getElementById('cancelProj').addEventListener('click', function(){ closeModal('modalProj'); });
+
+// ── AUFGABE MODAL ────────────────────────────────
+function openAufgModal(id) {
+  editAufgId = id;
+  var p = getActive();
+  var a = id ? p.aufgaben.find(function(x){ return x.id === id; }) : null;
+  var v = a ? aktV(a) : null;
+  document.getElementById('modalAufgTitle').textContent = a ? T('bearbAufg') : T('neueAufg');
+  document.getElementById('fAName').value = a ? a.name : '';
+  document.getElementById('fAOwner').value = a ? a.owner : '';
+  document.getElementById('fADept').value = a ? a.dept : '';
+  document.getElementById('fASoll').value = v ? (v.soll||'') : '';
+  document.getElementById('fAIst').value = v ? (v.ist||'') : '';
+  document.getElementById('fATermin').value = v ? (v.termin||'') : '';
+  document.getElementById('fAStatus').value = v ? v.status : 'Offen';
+  document.getElementById('fAAbh').value = a ? a.abh : '';
+  document.getElementById('fANotes').value = v ? (v.notes||'') : '';
+  renderIOList('inputList', 'input', v ? (v.inputs||[]) : []);
+  renderIOList('outputList', 'output', v ? (v.outputs||[]) : []);
+  document.getElementById('modalAufg').classList.add('open');
+}
+
+document.getElementById('saveAufg').addEventListener('click', function(){
+  var p = getActive();
+  var name = document.getElementById('fAName').value.trim();
+  if (!name) return;
+  var inputs = getIOList('inputList', 'input');
+  var outputs = getIOList('outputList', 'output');
+  var soll = parseFloat(document.getElementById('fASoll').value) || 0;
+  var ist = parseFloat(document.getElementById('fAIst').value) || 0;
+  var termin = document.getElementById('fATermin').value;
+  var status = document.getElementById('fAStatus').value;
+  var notes = document.getElementById('fANotes').value.trim();
+  if (editAufgId) {
+    var a = p.aufgaben.find(function(x){ return x.id === editAufgId; });
+    if (a) {
+      a.name = name; a.owner = document.getElementById('fAOwner').value.trim();
+      a.dept = document.getElementById('fADept').value.trim(); a.abh = document.getElementById('fAAbh').value.trim();
+      var v = aktV(a);
+      v.soll = soll; v.ist = ist; v.termin = termin; v.status = status; v.notes = notes;
+      v.inputs = inputs; v.outputs = outputs;
+    }
+  } else {
+    p.aufgaben.push({ id: 'a'+Date.now(), name: name,
+      owner: document.getElementById('fAOwner').value.trim(),
+      dept: document.getElementById('fADept').value.trim(),
+      abh: document.getElementById('fAAbh').value.trim(),
+      versionen: [{ ver:1, status:status, soll:soll, ist:ist, termin:termin, notes:notes, grund:'', inputs:inputs, outputs:outputs }]
+    });
+  }
+  save(); closeModal('modalAufg'); render();
+});
+
+document.getElementById('cancelAufg').addEventListener('click', function(){ closeModal('modalAufg'); });
+
+// ── IO LIST ──────────────────────────────────────
+function renderIOList(containerId, type, entries) {
+  var c = document.getElementById(containerId);
+  c.innerHTML = '';
+  entries.forEach(function(e){ addIORow(containerId, type, e); });
+}
+
+function addIORow(containerId, type, data) {
+  var c = document.getElementById(containerId);
+  var div = document.createElement('div');
+  div.className = 'io-entry';
+  var v1 = data ? (data.name||'') : '';
+  var v2 = data ? (type==='input' ? (data.von||'') : (data.ziel||'')) : '';
+  var v3 = data ? ((data.abt||'') + (data.datum ? ' · '+data.datum : '')) : '';
+  div.innerHTML = '<div class="fg" style="margin:0"><label class="fl">'+T('dateiname')+'</label><input class="fi" placeholder="Datei.pdf" value="'+v1+'"></div>'
+    + '<div class="fg" style="margin:0"><label class="fl">'+(type==='input'?T('von'):T('an'))+'</label><input class="fi" placeholder="Name" value="'+v2+'"></div>'
+    + '<div class="fg" style="margin:0"><label class="fl">'+T('abtDatum')+'</label><input class="fi" placeholder="Abt. · TT.MM." value="'+v3+'"></div>'
+    + '<button class="io-rm" type="button">×</button>';
+  div.querySelector('.io-rm').addEventListener('click', function(){ div.remove(); });
+  c.appendChild(div);
+}
+
+function getIOList(containerId, type) {
+  var c = document.getElementById(containerId);
+  var result = [];
+  c.querySelectorAll('.io-entry').forEach(function(div){
+    var ins = div.querySelectorAll('input');
+    var name = ins[0].value.trim();
+    if (!name) return;
+    var raw = ins[2].value.split('·');
+    if (type === 'input') result.push({ name:name, von:ins[1].value.trim(), abt:(raw[0]||'').trim(), datum:(raw[1]||'').trim() });
+    else result.push({ name:name, ziel:ins[1].value.trim(), abt:(raw[0]||'').trim(), datum:(raw[1]||'').trim() });
+  });
+  return result;
+}
+
+document.getElementById('addInputBtn').addEventListener('click', function(){ addIORow('inputList','input',null); });
+document.getElementById('addOutputBtn').addEventListener('click', function(){ addIORow('outputList','output',null); });
+
+// ── REVISION MODAL ───────────────────────────────
+function openRevModal(id) {
+  revTargetId = id;
+  document.getElementById('fRevGrund').value = '';
+  document.getElementById('fRevTermin').value = '';
+  document.getElementById('fRevSoll').value = '';
+  document.getElementById('modalRev').classList.add('open');
+}
+
+document.getElementById('saveRev').addEventListener('click', function(){
+  var p = getActive();
+  var a = p.aufgaben.find(function(x){ return x.id === revTargetId; });
+  if (!a) return;
+  var current = aktV(a);
+  var newVer = {
+    ver: a.versionen.length + 1,
+    status: 'In Bearbeitung',
+    soll: parseFloat(document.getElementById('fRevSoll').value) || current.soll,
+    ist: 0,
+    termin: document.getElementById('fRevTermin').value || current.termin,
+    notes: '',
+    grund: document.getElementById('fRevGrund').value.trim(),
+    inputs: [], outputs: []
+  };
+  a.versionen.push(newVer);
+  save(); closeModal('modalRev'); render();
+  setTimeout(function(){
+    var card = document.querySelector('.card[data-aid="'+revTargetId+'"]');
+    if (card) card.classList.add('open');
+  }, 100);
+});
+
+document.getElementById('cancelRev').addEventListener('click', function(){ closeModal('modalRev'); });
+
+// ── MODAL ────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(function(ov){
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.classList.remove('open'); });
+});
+
+// ── DRAWER ───────────────────────────────────────
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+document.getElementById('hamburgerBtn').addEventListener('click', openDrawer);
+document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+document.getElementById('sidebarAddBtn').addEventListener('click', openProjModal);
+document.getElementById('drawerAddBtn').addEventListener('click', function(){ openProjModal(); closeDrawer(); });
+
+// ── INIT ─────────────────────────────────────────
+load();
+if (projects.length > 0 && !activeProjId) activeProjId = projects[0].id;
+render();
+</script>
+</body>
+</html>
