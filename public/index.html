@@ -225,14 +225,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
     <div class="lerr" id="lErr"></div>
     <button class="lbtn" id="lBtn">Anmelden</button>
   </div>
-  <div class="foot">PlanWerk · designed by S.Varol</div>
+  <div class="foot">PlanWerk . designed by S.Varol</div>
 </div>
 
 <!-- CHANGE PW -->
 <div class="screen" id="scCpw" style="display:none">
   <div class="box">
     <div class="logo-big">Plan<span>Werk</span></div>
-    <div class="sub" style="color:var(--amber)">⚠ Bitte Passwort ändern</div>
+    <div class="sub" style="color:var(--amber)">! Bitte Passwort ändern</div>
     <div class="lf"><label class="ll">Altes Passwort</label><input class="li" type="password" id="cpOld"></div>
     <div class="lf"><label class="ll">Neues Passwort</label><input class="li" type="password" id="cpNew"></div>
     <div class="lf"><label class="ll">Wiederholen</label><input class="li" type="password" id="cpNew2"></div>
@@ -273,7 +273,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
         <button class="lbg" onclick="setLang('en')">EN</button>
       </div>
       <button class="tbtn" id="btnCpw">🔑</button>
-      <button class="tbtn" id="btnAdm" style="display:none">👑</button>
+      <button class="tbtn" id="btnAdm" style="display:none">Zugang</button>
       <button class="tbtn" id="btnOut">↩</button>
     </div>
   </div>
@@ -301,7 +301,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
     </div>
     <div class="main">
       <div class="empty" id="noProj" style="display:none">
-        <div style="font-size:44px;margin-bottom:14px">📋</div>
+        <div style="font-size:44px;margin-bottom:14px"></div>
         <div style="font-size:15px;font-weight:600;color:var(--navy)">Kein Projekt ausgewählt</div>
       </div>
       <div id="pView"></div>
@@ -312,7 +312,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
 <!-- MODAL: ADMIN -->
 <div class="overlay" id="mAdm">
   <div class="modal mlg">
-    <div class="mtt">👑 Admin-Panel</div>
+    <div class="mtt">[Admin] Admin-Panel</div>
     <div class="tabs">
       <button class="tab active" data-tab="tabUsers">Benutzer</button>
       <button class="tab" data-tab="tabAbt">Abteilungen</button>
@@ -411,19 +411,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
       <div class="fg"><label class="fl">Soll-Stunden</label><input class="fi" type="number" id="fAS"></div>
       <div class="fg"><label class="fl">Tahmini Bitiş</label><input class="fi" type="date" id="fAT"></div>
     </div>
-    <div class="fg"><label class="fl">Abhängig von (Voraussetzung)</label>
-      <select class="fsel" id="fADep">
-        <option value="">— Keine Abhängigkeit —</option>
+    <div class="fg"><label class="fl">Voraussetzung</label>
+      <input class="fi" id="fADepText" placeholder="Beschreibung eingeben..." style="margin-bottom:6px">
+      <select class="fsel" id="fADep" style="font-size:12px">
+        <option value="">-- Aufgabe auswählen (optional) --</option>
       </select>
     </div>
     <div class="fg"><label class="fl">Notizen</label><textarea class="fta" id="fAZ"></textarea></div>
     <div class="iosec">
-      <div class="iost">📥 Eingangsdaten (Inputs)</div>
+      <div class="iost"> Eingangsdaten (Inputs)</div>
       <div id="inList"></div>
       <button class="aio" id="btnAI">+ Input hinzufügen</button>
     </div>
     <div class="iosec">
-      <div class="iost">📤 Ausgangsdaten (Outputs)</div>
+      <div class="iost"> Ausgangsdaten (Outputs)</div>
       <div id="outList"></div>
       <button class="aio" id="btnAO">+ Output hinzufügen</button>
     </div>
@@ -437,7 +438,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
 <!-- MODAL: REVISION -->
 <div class="overlay" id="mRev">
   <div class="modal msm">
-    <div class="mtt">🔄 Revision erstellen</div>
+    <div class="mtt">Rev Revision erstellen</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Aktuelle Version wird archiviert.</div>
     <div class="fg"><label class="fl">Revisionsgrund</label><input class="fi" id="fRG"></div>
     <div class="fr">
@@ -502,6 +503,12 @@ function setLoginLang(l){
 function setLang(l){
   lang=l;
   document.querySelectorAll('.lbg').forEach(function(b){b.classList.toggle('active',b.textContent===l.toUpperCase());});
+  // Filter butonlarını güncelle
+  document.querySelectorAll('.fb').forEach(function(b){
+    var f=b.dataset.f;
+    if(f&&f!=='all')b.textContent=tSt(f);
+    else if(f==='all')b.textContent=lang==='en'?'All':'Alle';
+  });
   if(pid)renderProjView();
 }
 
