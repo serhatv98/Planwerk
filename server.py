@@ -2,13 +2,16 @@ from flask import Flask, request, jsonify, send_from_directory
 import sqlite3, os, json
 from datetime import datetime
 
-app = Flask(__name__, static_folder='public', static_url_path='')
+import os as _os
+_base = _os.path.dirname(_os.path.abspath(__file__))
+_static = _os.path.join(_base, 'public') if _os.path.exists(_os.path.join(_base, 'public', 'index.html')) else _base
+app = Flask(__name__, static_folder=_static, static_url_path='')
 
 DB_DIR = os.environ.get('DB_DIR', os.path.join(os.path.dirname(__file__), 'db'))
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, 'planwerk.db')
 
-ADMIN_PW = 'Serhat1133.'
+ADMIN_PW = 'SBG1234'
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -90,7 +93,7 @@ def send_notif(conn, user_name, message, aufgabe_id, project_id):
 
 @app.route('/')
 def index():
-    return send_from_directory('public', 'index.html')
+    return send_from_directory(app.static_folder, 'index.html')
 
 # ── AUTH ──────────────────────────────────────────
 @app.route('/api/login', methods=['POST'])
