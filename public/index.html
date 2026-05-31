@@ -521,9 +521,19 @@ document.getElementById('lPw').onkeydown=function(e){if(e.key==='Enter')doLogin(
 async function doLogin(){
   var name=document.getElementById('lName').value.trim(),pw=document.getElementById('lPw').value;
   document.getElementById('lErr').style.display='none';
-  if(!name||!pw){showErr('lErr','Name und Passwort eingeben.');return;}
-  var res=await api('POST','/api/login',{name,password:pw});
-  if(res.error){showErr('lErr',res.error);return;}
+  if(!name){showErr('lErr',lang==='de'?'Bitte Name eingeben.':'Please enter your name.');return;}
+  if(!pw){showErr('lErr',lang==='de'?'Bitte Passwort eingeben.':'Please enter your password.');return;}
+  var res=await api('POST','/api/login',{name,password:pw}).catch(function(){return{error:'Server nicht erreichbar.'};});
+  if(res.error){
+    if(res.error.indexOf('nicht gefunden')>=0||res.error.indexOf('not found')>=0){
+      showErr('lErr',lang==='de'?'Benutzer nicht gefunden. Bitte Admin kontaktieren.':'User not found. Please contact admin.');
+    } else if(res.error.indexOf('Passwort')>=0||res.error.indexOf('password')>=0){
+      showErr('lErr',lang==='de'?'Falsches Passwort.':'Wrong password.');
+    } else {
+      showErr('lErr',res.error);
+    }
+    return;
+  }
   CU=res.name;CR=res.role;
   if(res.must_change_pw){document.getElementById('scLogin').style.display='none';document.getElementById('scCpw').style.display='flex';document.getElementById('cpOld').value=pw;return;}
   startApp();
@@ -1010,15 +1020,21 @@ function closeDrawer(){document.getElementById('drawer').classList.remove('open'
 
 // ── INIT ─────────────────────────────────────────
 // Sayfa yenilenince oturumu geri yükle
-(function(){
+(async function(){
   var su=sessionStorage.getItem('pw_user');
   var sr=sessionStorage.getItem('pw_role');
   if(su&&sr){
-    CU=su;CR=sr;
-    startApp();
+    try {
+      // Sunucuya doğrula
+      var res=await fetch('/api/users');
+      if(res.ok){CU=su;CR=sr;startApp();return;}
+    } catch(e){}
+    // Sunucu cevap vermediyse session temizle
+    sessionStorage.removeItem('pw_user');
+    sessionStorage.removeItem('pw_role');
   }
+  setLang('de');
 })();
-setLang('de');
 </script>
 </body>
 </html>
