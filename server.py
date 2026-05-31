@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
-import sqlite3, os, json
+import sqlite3, os, hashlib, secrets
 from datetime import datetime
 
 import os as _os
@@ -12,6 +12,9 @@ os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, 'planwerk.db')
 
 ADMIN_PW = 'SBG1234'
+
+def hash_pw(pw):
+    return hashlib.sha256(pw.encode()).hexdigest()
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -26,6 +29,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
             role TEXT DEFAULT 'user',
+            password_hash TEXT,
+            must_change_pw INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now'))
         );
         CREATE TABLE IF NOT EXISTS projects (
@@ -60,9 +65,6 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         );
         ''')
-        admin = conn.execute("SELECT id FROM users WHERE name='Admin'").fetchone()
-        if not admin:
-            conn.execute("INSERT INTO users (name, role) VALUES ('Admin','admin')")
         conn.commit()
 
 init_db()
@@ -88,8 +90,11 @@ def get_full_project(pid):
         return proj
 
 def send_notif(conn, user_name, message, aufgabe_id, project_id):
-    conn.execute("INSERT INTO notifications (user_name, message, aufgabe_id, project_id) VALUES (?,?,?,?)",
-                 (user_name, message, aufgabe_id, project_id))
+    # Kullanıcı sistemde kayıtlı mı kontrol et
+    user = conn.execute("SELECT id FROM users WHERE name=?", (user_name,)).fetchone()
+    if user:
+        conn.execute("INSERT INTO notifications (user_name, message, aufgabe_id, project_id) VALUES (?,?,?,?)",
+                     (user_name, message, aufgabe_id, project_id))
 
 @app.route('/')
 def index():
@@ -101,23 +106,76 @@ def login():
     data = request.json
     name = data.get('name','').strip()
     password = data.get('password','')
-    if not name:
-        return jsonify({'error':'Name erforderlich'}), 400
+    if not name or not password:
+        return jsonify({'error':'Name und Passwort erforderlich'}), 400
     if name == 'Admin':
         if password != ADMIN_PW:
             return jsonify({'error':'Falsches Passwort'}), 401
-        return jsonify({'name':'Admin','role':'admin'})
+        return jsonify({'name':'Admin','role':'admin','must_change_pw':False})
     with get_db() as conn:
         user = row_to_dict(conn.execute("SELECT * FROM users WHERE name=?", (name,)).fetchone())
         if not user:
-            conn.execute("INSERT OR IGNORE INTO users (name, role) VALUES (?,?)", (name,'user'))
-            conn.commit()
-        return jsonify({'name':name,'role':'user'})
+            return jsonify({'error':'Benutzer nicht gefunden'}), 401
+        if user['password_hash'] != hash_pw(password):
+            return jsonify({'error':'Falsches Passwort'}), 401
+        return jsonify({'name':user['name'],'role':user['role'],'must_change_pw':bool(user['must_change_pw'])})
 
-@app.route('/api/users')
+@app.route('/api/change_password', methods=['POST'])
+def change_password():
+    data = request.json
+    name = data.get('name','')
+    old_pw = data.get('old_password','')
+    new_pw = data.get('new_password','')
+    if not new_pw or len(new_pw) < 4:
+        return jsonify({'error':'Passwort zu kurz (min. 4 Zeichen)'}), 400
+    with get_db() as conn:
+        user = row_to_dict(conn.execute("SELECT * FROM users WHERE name=?", (name,)).fetchone())
+        if not user: return jsonify({'error':'Nicht gefunden'}), 404
+        if user['password_hash'] != hash_pw(old_pw):
+            return jsonify({'error':'Altes Passwort falsch'}), 401
+        conn.execute("UPDATE users SET password_hash=?, must_change_pw=0 WHERE name=?", (hash_pw(new_pw), name))
+        conn.commit()
+    return jsonify({'ok':True})
+
+# ── USER MANAGEMENT (Admin) ────────────────────────
+@app.route('/api/users', methods=['GET'])
 def get_users():
     with get_db() as conn:
-        return jsonify(rows_to_list(conn.execute("SELECT name,role FROM users ORDER BY name").fetchall()))
+        users = rows_to_list(conn.execute("SELECT id, name, role, must_change_pw, created_at FROM users ORDER BY name").fetchall())
+        return jsonify(users)
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    d = request.json
+    name = d.get('name','').strip()
+    pw = d.get('password','')
+    role = d.get('role','user')
+    if not name or not pw:
+        return jsonify({'error':'Name und Passwort erforderlich'}), 400
+    with get_db() as conn:
+        existing = conn.execute("SELECT id FROM users WHERE name=?", (name,)).fetchone()
+        if existing: return jsonify({'error':'Benutzer existiert bereits'}), 409
+        conn.execute("INSERT INTO users (name, role, password_hash, must_change_pw) VALUES (?,?,?,1)",
+                     (name, role, hash_pw(pw)))
+        conn.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/users/<name>', methods=['DELETE'])
+def delete_user(name):
+    with get_db() as conn:
+        conn.execute("DELETE FROM users WHERE name=?", (name,))
+        conn.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/users/<name>/reset_password', methods=['POST'])
+def reset_password(name):
+    d = request.json
+    new_pw = d.get('password','')
+    if not new_pw: return jsonify({'error':'Passwort erforderlich'}), 400
+    with get_db() as conn:
+        conn.execute("UPDATE users SET password_hash=?, must_change_pw=1 WHERE name=?", (hash_pw(new_pw), name))
+        conn.commit()
+    return jsonify({'ok':True})
 
 # ── PROJECTS ──────────────────────────────────────
 @app.route('/api/projects', methods=['GET'])
@@ -134,11 +192,35 @@ def create_project():
         conn.commit()
     return jsonify({'ok':True})
 
-@app.route('/api/projects/<pid>')
+@app.route('/api/projects/<pid>', methods=['GET'])
 def get_project(pid):
     proj = get_full_project(pid)
     if not proj: return jsonify({'error':'Nicht gefunden'}), 404
     return jsonify(proj)
+
+@app.route('/api/projects/<pid>', methods=['PUT'])
+def update_project(pid):
+    d = request.json
+    with get_db() as conn:
+        conn.execute("UPDATE projects SET name=?,desc=?,owner=?,deadline=? WHERE id=?",
+                     (d['name'],d.get('desc',''),d.get('owner',''),d.get('deadline',''),pid))
+        conn.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/projects/<pid>', methods=['DELETE'])
+def delete_project(pid):
+    with get_db() as conn:
+        aufgaben = rows_to_list(conn.execute("SELECT id FROM aufgaben WHERE project_id=?", (pid,)).fetchall())
+        for a in aufgaben:
+            vers = rows_to_list(conn.execute("SELECT id FROM versionen WHERE aufgabe_id=?", (a['id'],)).fetchall())
+            for v in vers:
+                conn.execute("DELETE FROM inputs WHERE version_id=?", (v['id'],))
+                conn.execute("DELETE FROM outputs WHERE version_id=?", (v['id'],))
+            conn.execute("DELETE FROM versionen WHERE aufgabe_id=?", (a['id'],))
+        conn.execute("DELETE FROM aufgaben WHERE project_id=?", (pid,))
+        conn.execute("DELETE FROM projects WHERE id=?", (pid,))
+        conn.commit()
+    return jsonify({'ok':True})
 
 # ── AUFGABEN ──────────────────────────────────────
 @app.route('/api/aufgaben', methods=['POST'])
@@ -169,6 +251,7 @@ def update_aufgabe(aid):
                      (d['name'],d.get('owner',''),d.get('dept',''),d.get('abh',''),aid))
         ver = row_to_dict(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver DESC LIMIT 1",(aid,)).fetchone())
         if ver and v:
+            old_status = ver['status']
             conn.execute("UPDATE versionen SET status=?,soll=?,ist=?,termin=?,notes=? WHERE id=?",
                          (v.get('status','Offen'),v.get('soll',0),v.get('ist',0),v.get('termin',''),v.get('notes',''),ver['id']))
             conn.execute("DELETE FROM inputs WHERE version_id=?", (ver['id'],))
@@ -179,13 +262,13 @@ def update_aufgabe(aid):
             for out in v.get('outputs',[]):
                 conn.execute("INSERT INTO outputs (version_id,name,ziel,abt,datum) VALUES (?,?,?,?,?)",
                              (ver['id'],out.get('name',''),out.get('ziel',''),out.get('abt',''),out.get('datum','')))
-            if v.get('status') == 'Abgeschlossen':
+            if v.get('status') == 'Abgeschlossen' and old_status != 'Abgeschlossen':
                 aufg = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?",(aid,)).fetchone())
                 proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?",(aufg['project_id'],)).fetchone())
                 outs = rows_to_list(conn.execute("SELECT * FROM outputs WHERE version_id=?",(ver['id'],)).fetchall())
                 for out in outs:
                     if out.get('ziel'):
-                        send_notif(conn, out['ziel'], '"'+aufg['name']+'" wurde abgeschlossen. Du kannst jetzt beginnen! (Projekt: '+proj['name']+')', aid, aufg['project_id'])
+                        send_notif(conn, out['ziel'], '"'+ aufg['name']+'" wurde abgeschlossen. Du kannst jetzt beginnen! (Projekt: '+proj['name']+')', aid, aufg['project_id'])
         conn.commit()
     return jsonify({'ok':True})
 
@@ -197,14 +280,15 @@ def quick_status(aid):
     with get_db() as conn:
         ver = row_to_dict(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver DESC LIMIT 1",(aid,)).fetchone())
         if not ver: return jsonify({'error':'Nicht gefunden'}), 404
+        old_status = ver['status']
         conn.execute("UPDATE versionen SET status=? WHERE id=?",(status,ver['id']))
-        if status == 'Abgeschlossen':
+        if status == 'Abgeschlossen' and old_status != 'Abgeschlossen':
             aufg = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?",(aid,)).fetchone())
             proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?",(aufg['project_id'],)).fetchone())
             outs = rows_to_list(conn.execute("SELECT * FROM outputs WHERE version_id=?",(ver['id'],)).fetchall())
             for out in outs:
                 if out.get('ziel') and out['ziel'] != user:
-                    send_notif(conn, out['ziel'], '"'+aufg['name']+'" wurde abgeschlossen. Du kannst jetzt beginnen! (Projekt: '+proj['name']+')', aid, aufg['project_id'])
+                    send_notif(conn, out['ziel'], '"'+ aufg['name']+'" wurde abgeschlossen. Du kannst jetzt beginnen! (Projekt: '+proj['name']+')', aid, aufg['project_id'])
         conn.commit()
     return jsonify({'ok':True})
 
@@ -257,7 +341,7 @@ def create_revision(aid):
 @app.route('/api/notifications/<user>')
 def get_notifications(user):
     with get_db() as conn:
-        return jsonify(rows_to_list(conn.execute("SELECT * FROM notifications WHERE user_name=? ORDER BY created_at DESC LIMIT 20",(user,)).fetchall()))
+        return jsonify(rows_to_list(conn.execute("SELECT * FROM notifications WHERE user_name=? ORDER BY created_at DESC LIMIT 30",(user,)).fetchall()))
 
 @app.route('/api/notifications/<int:nid>/read', methods=['PATCH'])
 def mark_read(nid):
