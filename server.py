@@ -35,8 +35,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS abteilung_members (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            abteilung_id INTEGER NOT NULL,
-            user_name TEXT NOT NULL,
+            abteilung_id INTEGER NOT NULL, user_name TEXT NOT NULL,
             UNIQUE(abteilung_id, user_name)
         );
         CREATE TABLE IF NOT EXISTS projects (
@@ -52,8 +51,21 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS aufgaben (
             id TEXT PRIMARY KEY, project_id TEXT NOT NULL,
-            name TEXT NOT NULL, owner TEXT, dept TEXT, abh TEXT,
+            name TEXT NOT NULL,
+            abteilung TEXT,
+            bearbeiter TEXT, pruefer TEXT, freigabe TEXT,
+            depends_on TEXT,
+            status TEXT DEFAULT 'Ausstehend',
+            accepted_by TEXT, accepted_at TEXT,
+            est_finish TEXT,
             created_by TEXT, created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS status_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            aufgabe_id TEXT NOT NULL,
+            old_status TEXT, new_status TEXT,
+            changed_by TEXT,
+            changed_at TEXT DEFAULT (datetime('now'))
         );
         CREATE TABLE IF NOT EXISTS versionen (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,16 +76,18 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS inputs (
             id INTEGER PRIMARY KEY AUTOINCREMENT, version_id INTEGER NOT NULL,
-            name TEXT, von TEXT, abt TEXT, datum TEXT
+            name TEXT, von_aufgabe_id TEXT, von_abt TEXT, fertig INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS outputs (
             id INTEGER PRIMARY KEY AUTOINCREMENT, version_id INTEGER NOT NULL,
-            name TEXT, ziel TEXT, abt TEXT, datum TEXT
+            name TEXT, fuer_aufgabe_id TEXT, fuer_abt TEXT,
+            abgeschlossen_at TEXT
         );
         CREATE TABLE IF NOT EXISTS notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_name TEXT NOT NULL, message TEXT NOT NULL,
-            aufgabe_id TEXT, project_id TEXT, read INTEGER DEFAULT 0,
+            aufgabe_id TEXT, project_id TEXT, type TEXT DEFAULT 'info',
+            read INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now'))
         );
         ''')
@@ -84,12 +98,20 @@ init_db()
 def row_to_dict(row): return dict(row) if row else None
 def rows_to_list(rows): return [dict(r) for r in rows]
 
-def send_notif(conn, user_name, message, aufgabe_id=None, project_id=None):
+def send_notif(conn, user_name, message, aufgabe_id=None, project_id=None, ntype='info'):
     if not user_name: return
     user = conn.execute("SELECT id FROM users WHERE name=?", (user_name,)).fetchone()
     if user:
-        conn.execute("INSERT INTO notifications (user_name,message,aufgabe_id,project_id) VALUES (?,?,?,?)",
-                     (user_name, message, aufgabe_id, project_id))
+        conn.execute("INSERT INTO notifications (user_name,message,aufgabe_id,project_id,type) VALUES (?,?,?,?,?)",
+                     (user_name, message, aufgabe_id, project_id, ntype))
+
+def send_notif_to_abt(conn, abt_name, message, aufgabe_id=None, project_id=None, ntype='info', exclude=None):
+    members = rows_to_list(conn.execute(
+        "SELECT am.user_name FROM abteilung_members am JOIN abteilungen a ON a.id=am.abteilung_id WHERE a.name=?",
+        (abt_name,)).fetchall())
+    for m in members:
+        if m['user_name'] != exclude:
+            send_notif(conn, m['user_name'], message, aufgabe_id, project_id, ntype)
 
 def get_full_project(pid):
     with get_db() as conn:
@@ -103,20 +125,10 @@ def get_full_project(pid):
                 v['inputs'] = rows_to_list(conn.execute("SELECT * FROM inputs WHERE version_id=?", (v['id'],)).fetchall())
                 v['outputs'] = rows_to_list(conn.execute("SELECT * FROM outputs WHERE version_id=?", (v['id'],)).fetchall())
             a['versionen'] = vers
+            a['status_history'] = rows_to_list(conn.execute(
+                "SELECT * FROM status_history WHERE aufgabe_id=? ORDER BY changed_at", (a['id'],)).fetchall())
         proj['aufgaben'] = aufgaben
         return proj
-
-def can_access(user_name, role, project_id):
-    if role == 'admin': return True
-    with get_db() as conn:
-        m = conn.execute("SELECT id FROM project_members WHERE project_id=? AND user_name=?", (project_id, user_name)).fetchone()
-        return m is not None
-
-def can_edit(user_name, role, project_id):
-    if role == 'admin': return True
-    with get_db() as conn:
-        m = row_to_dict(conn.execute("SELECT * FROM project_members WHERE project_id=? AND user_name=?", (project_id, user_name)).fetchone())
-        return m and (m['can_edit'] or m['can_delete'])
 
 @app.route('/')
 def index():
@@ -196,6 +208,14 @@ def get_abteilungen():
     with get_db() as conn:
         return jsonify(rows_to_list(conn.execute("SELECT * FROM abteilungen ORDER BY name").fetchall()))
 
+@app.route('/api/abteilungen/with_members', methods=['GET'])
+def get_abteilungen_with_members():
+    with get_db() as conn:
+        abts = rows_to_list(conn.execute("SELECT * FROM abteilungen ORDER BY name").fetchall())
+        for a in abts:
+            a['members'] = rows_to_list(conn.execute("SELECT * FROM abteilung_members WHERE abteilung_id=?", (a['id'],)).fetchall())
+        return jsonify(abts)
+
 @app.route('/api/abteilungen', methods=['POST'])
 def create_abteilung():
     name = request.json.get('name','').strip()
@@ -211,40 +231,27 @@ def create_abteilung():
 def delete_abteilung(aid):
     with get_db() as conn:
         conn.execute("DELETE FROM abteilungen WHERE id=?", (aid,))
+        conn.execute("DELETE FROM abteilung_members WHERE abteilung_id=?", (aid,))
         conn.commit()
     return jsonify({'ok':True})
-
-# ── ABT MEMBERS ──────────────────────────────────────────────
-@app.route('/api/abteilungen/<int:aid>/members', methods=['GET'])
-def get_abt_members(aid):
-    with get_db() as conn:
-        return jsonify(rows_to_list(conn.execute("SELECT * FROM abteilung_members WHERE abteilung_id=?", (aid,)).fetchall()))
 
 @app.route('/api/abteilungen/<int:aid>/members', methods=['POST'])
 def add_abt_member(aid):
     user_name = request.json.get('user_name','').strip()
     if not user_name: return jsonify({'error':'Name erforderlich'}), 400
     with get_db() as conn:
-        conn.execute("INSERT OR IGNORE INTO abteilung_members (abteilung_id, user_name) VALUES (?,?)", (aid, user_name))
+        conn.execute("INSERT OR IGNORE INTO abteilung_members (abteilung_id,user_name) VALUES (?,?)", (aid,user_name))
         conn.commit()
     return jsonify({'ok':True})
 
 @app.route('/api/abteilungen/<int:aid>/members/<user_name>', methods=['DELETE'])
 def remove_abt_member(aid, user_name):
     with get_db() as conn:
-        conn.execute("DELETE FROM abteilung_members WHERE abteilung_id=? AND user_name=?", (aid, user_name))
+        conn.execute("DELETE FROM abteilung_members WHERE abteilung_id=? AND user_name=?", (aid,user_name))
         conn.commit()
     return jsonify({'ok':True})
 
-@app.route('/api/abteilungen/with_members', methods=['GET'])
-def get_abteilungen_with_members():
-    with get_db() as conn:
-        abts = rows_to_list(conn.execute("SELECT * FROM abteilungen ORDER BY name").fetchall())
-        for a in abts:
-            a['members'] = rows_to_list(conn.execute("SELECT * FROM abteilung_members WHERE abteilung_id=?", (a['id'],)).fetchall())
-        return jsonify(abts)
-
-
+# ── PROJECTS ──────────────────────────────────────
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
     user_name = request.args.get('user','')
@@ -266,7 +273,6 @@ def create_project():
     with get_db() as conn:
         conn.execute("INSERT INTO projects (id,name,desc,owner,deadline,color) VALUES (?,?,?,?,?,?)",
                      (d['id'],d['name'],d.get('desc',''),d.get('owner',''),d.get('deadline',''),d.get('color','#00897b')))
-        # Oluşturanı otomatik üye yap (tam yetki)
         if d.get('created_by') and d.get('created_by') != 'Admin':
             conn.execute("INSERT OR IGNORE INTO project_members (project_id,user_name,can_edit,can_delete) VALUES (?,?,1,1)",
                          (d['id'],d['created_by']))
@@ -298,13 +304,13 @@ def delete_project(pid):
                 conn.execute("DELETE FROM inputs WHERE version_id=?", (v['id'],))
                 conn.execute("DELETE FROM outputs WHERE version_id=?", (v['id'],))
             conn.execute("DELETE FROM versionen WHERE aufgabe_id=?", (a['id'],))
+            conn.execute("DELETE FROM status_history WHERE aufgabe_id=?", (a['id'],))
         conn.execute("DELETE FROM aufgaben WHERE project_id=?", (pid,))
         conn.execute("DELETE FROM project_members WHERE project_id=?", (pid,))
         conn.execute("DELETE FROM projects WHERE id=?", (pid,))
         conn.commit()
     return jsonify({'ok':True})
 
-# ── ÜYELER ────────────────────────────────────────
 @app.route('/api/projects/<pid>/members', methods=['POST'])
 def add_member(pid):
     d = request.json
@@ -315,7 +321,7 @@ def add_member(pid):
         conn.execute("INSERT OR REPLACE INTO project_members (project_id,user_name,can_edit,can_delete) VALUES (?,?,?,?)",
                      (pid,user_name,can_edit,can_delete))
         proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone())
-        send_notif(conn, user_name, 'Du wurdest zum Projekt "'+proj['name']+'" hinzugefugt.', None, pid)
+        send_notif(conn, user_name, 'Du wurdest zum Projekt "'+proj['name']+'" hinzugefuegt.', None, pid, 'project')
         conn.commit()
     return jsonify({'ok':True})
 
@@ -330,80 +336,167 @@ def remove_member(pid, user_name):
 @app.route('/api/aufgaben', methods=['POST'])
 def create_aufgabe():
     d = request.json
-    v = d.get('version',{})
+    now = datetime.now().isoformat()
     with get_db() as conn:
-        conn.execute("INSERT INTO aufgaben (id,project_id,name,owner,dept,abh,created_by) VALUES (?,?,?,?,?,?,?)",
-                     (d['id'],d['project_id'],d['name'],d.get('owner',''),d.get('dept',''),d.get('abh',''),d.get('created_by','')))
+        conn.execute("""INSERT INTO aufgaben 
+            (id,project_id,name,abteilung,bearbeiter,pruefer,freigabe,depends_on,status,est_finish,created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (d['id'],d['project_id'],d['name'],d.get('abteilung',''),
+             d.get('bearbeiter',''),d.get('pruefer',''),d.get('freigabe',''),
+             d.get('depends_on',''),d.get('status','Ausstehend'),
+             d.get('est_finish',''),d.get('created_by','')))
+        
+        # Status history
+        conn.execute("INSERT INTO status_history (aufgabe_id,old_status,new_status,changed_by) VALUES (?,?,?,?)",
+                     (d['id'],'',d.get('status','Ausstehend'),d.get('created_by','')))
+        
+        # Versiyon oluştur
         r = conn.execute("INSERT INTO versionen (aufgabe_id,ver,status,soll,ist,termin,notes,grund,created_by) VALUES (?,1,?,?,?,?,?,?,?)",
-                         (d['id'],v.get('status','Offen'),v.get('soll',0),v.get('ist',0),v.get('termin',''),v.get('notes',''),'',d.get('created_by','')))
+                         (d['id'],d.get('status','Ausstehend'),d.get('soll',0),0,d.get('est_finish',''),'','',d.get('created_by','')))
         vid = r.lastrowid
-        for inp in v.get('inputs',[]):
-            conn.execute("INSERT INTO inputs (version_id,name,von,abt,datum) VALUES (?,?,?,?,?)",
-                         (vid,inp.get('name',''),inp.get('von',''),inp.get('abt',''),inp.get('datum','')))
-        for out in v.get('outputs',[]):
-            conn.execute("INSERT INTO outputs (version_id,name,ziel,abt,datum) VALUES (?,?,?,?,?)",
-                         (vid,out.get('name',''),out.get('ziel',''),out.get('abt',''),out.get('datum','')))
-            if out.get('ziel'):
-                proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (d['project_id'],)).fetchone())
-                aufg_name = d['name']
-                send_notif(conn, out['ziel'], '"'+aufg_name+'" - Du wurdest als Ausgabe-Empfanger hinzugefugt. (Projekt: '+proj['name']+')', d['id'], d['project_id'])
+        
+        # Inputlar
+        for inp in d.get('inputs',[]):
+            conn.execute("INSERT INTO inputs (version_id,name,von_aufgabe_id,von_abt,fertig) VALUES (?,?,?,?,0)",
+                         (vid,inp.get('name',''),inp.get('von_aufgabe_id',''),inp.get('von_abt','')))
+        
+        # Outputlar
+        for out in d.get('outputs',[]):
+            conn.execute("INSERT INTO outputs (version_id,name,fuer_aufgabe_id,fuer_abt) VALUES (?,?,?,?)",
+                         (vid,out.get('name',''),out.get('fuer_aufgabe_id',''),out.get('fuer_abt','')))
+
+        proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (d['project_id'],)).fetchone())
+        
+        # Depends_on olan abteilung'a bildirim
+        if d.get('depends_on'):
+            dep_aufg = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?", (d['depends_on'],)).fetchone())
+            if dep_aufg and dep_aufg.get('abteilung'):
+                msg = '"'+d['name']+'" goerevi icin "'+dep_aufg['name']+'" gereklidir. Bitte bestaetigen. (Projekt: '+proj['name']+')'
+                send_notif_to_abt(conn, dep_aufg['abteilung'], msg, d['id'], d['project_id'], 'request', d.get('created_by'))
+
         conn.commit()
     return jsonify({'ok':True})
 
 @app.route('/api/aufgaben/<aid>', methods=['PUT'])
 def update_aufgabe(aid):
     d = request.json
-    v = d.get('version',{})
     with get_db() as conn:
-        conn.execute("UPDATE aufgaben SET name=?,owner=?,dept=?,abh=? WHERE id=?",
-                     (d['name'],d.get('owner',''),d.get('dept',''),d.get('abh',''),aid))
+        old = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?", (aid,)).fetchone())
+        conn.execute("""UPDATE aufgaben SET name=?,abteilung=?,bearbeiter=?,pruefer=?,freigabe=?,
+                     depends_on=?,est_finish=? WHERE id=?""",
+                     (d['name'],d.get('abteilung',''),d.get('bearbeiter',''),
+                      d.get('pruefer',''),d.get('freigabe',''),
+                      d.get('depends_on',''),d.get('est_finish',''),aid))
+        
+        # Versiyon güncelle
         ver = row_to_dict(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver DESC LIMIT 1",(aid,)).fetchone())
-        if ver and v:
-            old_status = ver['status']
-            # Eski outputları al (bildirim karşılaştırması için)
-            old_outputs = rows_to_list(conn.execute("SELECT * FROM outputs WHERE version_id=?", (ver['id'],)).fetchall())
-            old_ziel_set = set(o['ziel'] for o in old_outputs if o.get('ziel'))
-            conn.execute("UPDATE versionen SET status=?,soll=?,ist=?,termin=?,notes=? WHERE id=?",
-                         (v.get('status','Offen'),v.get('soll',0),v.get('ist',0),v.get('termin',''),v.get('notes',''),ver['id']))
+        if ver:
+            conn.execute("UPDATE versionen SET soll=?,termin=?,notes=? WHERE id=?",
+                         (d.get('soll',0),d.get('est_finish',''),d.get('notes',''),ver['id']))
             conn.execute("DELETE FROM inputs WHERE version_id=?", (ver['id'],))
             conn.execute("DELETE FROM outputs WHERE version_id=?", (ver['id'],))
-            aufg = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?", (aid,)).fetchone())
-            proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (aufg['project_id'],)).fetchone())
-            for inp in v.get('inputs',[]):
-                conn.execute("INSERT INTO inputs (version_id,name,von,abt,datum) VALUES (?,?,?,?,?)",
-                             (ver['id'],inp.get('name',''),inp.get('von',''),inp.get('abt',''),inp.get('datum','')))
-            for out in v.get('outputs',[]):
-                conn.execute("INSERT INTO outputs (version_id,name,ziel,abt,datum) VALUES (?,?,?,?,?)",
-                             (ver['id'],out.get('name',''),out.get('ziel',''),out.get('abt',''),out.get('datum','')))
-                # Yeni eklenen output kişisine bildirim
-                if out.get('ziel') and out['ziel'] not in old_ziel_set:
-                    send_notif(conn, out['ziel'], '"'+aufg['name']+'" - Du wurdest als Ausgabe-Empfanger hinzugefugt. (Projekt: '+proj['name']+')', aid, aufg['project_id'])
-            # Abgeschlossen bildirimi
-            if v.get('status') == 'Abgeschlossen' and old_status != 'Abgeschlossen':
-                new_outputs = v.get('outputs',[])
-                for out in new_outputs:
-                    if out.get('ziel'):
-                        send_notif(conn, out['ziel'], '"'+aufg['name']+'" wurde abgeschlossen. Du kannst jetzt beginnen! (Projekt: '+proj['name']+')', aid, aufg['project_id'])
+            for inp in d.get('inputs',[]):
+                conn.execute("INSERT INTO inputs (version_id,name,von_aufgabe_id,von_abt,fertig) VALUES (?,?,?,?,0)",
+                             (ver['id'],inp.get('name',''),inp.get('von_aufgabe_id',''),inp.get('von_abt','')))
+            for out in d.get('outputs',[]):
+                conn.execute("INSERT INTO outputs (version_id,name,fuer_aufgabe_id,fuer_abt) VALUES (?,?,?,?)",
+                             (ver['id'],out.get('name',''),out.get('fuer_aufgabe_id',''),out.get('fuer_abt','')))
+        conn.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/aufgaben/<aid>/accept', methods=['POST'])
+def accept_aufgabe(aid):
+    d = request.json
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        aufg = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?", (aid,)).fetchone())
+        if not aufg: return jsonify({'error':'Nicht gefunden'}), 404
+        
+        conn.execute("""UPDATE aufgaben SET status='In Bearbeitung',accepted_by=?,accepted_at=?,
+                     bearbeiter=?,pruefer=?,freigabe=?,est_finish=? WHERE id=?""",
+                     (d.get('accepted_by',''),now,
+                      d.get('bearbeiter',''),d.get('pruefer',''),d.get('freigabe',''),
+                      d.get('est_finish',''),aid))
+        
+        conn.execute("INSERT INTO status_history (aufgabe_id,old_status,new_status,changed_by) VALUES (?,?,?,?)",
+                     (aid,aufg['status'],'In Bearbeitung',d.get('accepted_by','')))
+        
+        proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (aufg['project_id'],)).fetchone())
+        
+        # Görevi isteyen abteilung'a bildirim
+        # O görevin depend eden görevi bul
+        dep_aufgaben = rows_to_list(conn.execute("SELECT * FROM aufgaben WHERE depends_on=?", (aid,)).fetchall())
+        for dep in dep_aufgaben:
+            if dep.get('abteilung'):
+                msg = '"'+aufg['name']+'" kabul edildi. Bearbeiter: '+d.get('bearbeiter','')+', Tahmini bitis: '+d.get('est_finish','—')+'  (Projekt: '+proj['name']+')'
+                send_notif_to_abt(conn, dep['abteilung'], msg, aid, aufg['project_id'], 'accepted')
+        
         conn.commit()
     return jsonify({'ok':True})
 
 @app.route('/api/aufgaben/<aid>/status', methods=['PATCH'])
 def quick_status(aid):
     d = request.json
-    status = d.get('status')
-    user = d.get('user','')
+    new_status = d.get('status')
+    changed_by = d.get('user','')
+    now = datetime.now().isoformat()
     with get_db() as conn:
+        aufg = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?", (aid,)).fetchone())
+        if not aufg: return jsonify({'error':'Nicht gefunden'}), 404
+        old_status = aufg['status']
+        
+        conn.execute("UPDATE aufgaben SET status=? WHERE id=?", (new_status,aid))
+        conn.execute("INSERT INTO status_history (aufgabe_id,old_status,new_status,changed_by) VALUES (?,?,?,?)",
+                     (aid,old_status,new_status,changed_by))
+        
+        # Versiyonu da güncelle
         ver = row_to_dict(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver DESC LIMIT 1",(aid,)).fetchone())
-        if not ver: return jsonify({'error':'Nicht gefunden'}), 404
-        old_status = ver['status']
-        conn.execute("UPDATE versionen SET status=? WHERE id=?",(status,ver['id']))
-        if status == 'Abgeschlossen' and old_status != 'Abgeschlossen':
-            aufg = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?", (aid,)).fetchone())
-            proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (aufg['project_id'],)).fetchone())
-            outs = rows_to_list(conn.execute("SELECT * FROM outputs WHERE version_id=?", (ver['id'],)).fetchall())
-            for out in outs:
-                if out.get('ziel') and out['ziel'] != user:
-                    send_notif(conn, out['ziel'], '"'+aufg['name']+'" wurde abgeschlossen. Du kannst jetzt beginnen! (Projekt: '+proj['name']+')', aid, aufg['project_id'])
+        if ver:
+            conn.execute("UPDATE versionen SET status=? WHERE id=?", (new_status,ver['id']))
+
+        proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (aufg['project_id'],)).fetchone())
+        
+        if new_status == 'Abgeschlossen' and old_status != 'Abgeschlossen':
+            # Output tarihlerini güncelle
+            ver = row_to_dict(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver DESC LIMIT 1",(aid,)).fetchone())
+            if ver:
+                conn.execute("UPDATE outputs SET abgeschlossen_at=? WHERE version_id=?", (now,ver['id']))
+                
+                # Bağımlı görevlerin inputlarını güncelle
+                outs = rows_to_list(conn.execute("SELECT * FROM outputs WHERE version_id=?", (ver['id'],)).fetchall())
+                dep_aufgaben = rows_to_list(conn.execute("SELECT * FROM aufgaben WHERE depends_on=?", (aid,)).fetchall())
+                
+                for dep in dep_aufgaben:
+                    # O görevin inputlarını hazır işaretle
+                    dep_ver = row_to_dict(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver DESC LIMIT 1",(dep['id'],)).fetchone())
+                    if dep_ver:
+                        conn.execute("UPDATE inputs SET fertig=1 WHERE version_id=? AND von_aufgabe_id=?", (dep_ver['id'],aid))
+                    
+                    # Bildirim gönder
+                    if dep.get('abteilung'):
+                        msg = '"'+aufg['name']+'" abgeschlossen! "'+dep['name']+'" kann jetzt beginnen. (Projekt: '+proj['name']+')'
+                        send_notif_to_abt(conn, dep['abteilung'], msg, dep['id'], aufg['project_id'], 'ready')
+                    
+                    # Direkt kişilere de bildirim
+                    for person in [dep.get('bearbeiter'),dep.get('pruefer')]:
+                        if person and person != changed_by:
+                            send_notif(conn, person, '"'+aufg['name']+'" abgeschlossen! "'+dep['name']+'" kann jetzt beginnen. (Projekt: '+proj['name']+')', dep['id'], aufg['project_id'], 'ready')
+        
+        conn.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/aufgaben/<aid>/revision', methods=['POST'])
+def create_revision(aid):
+    d = request.json
+    with get_db() as conn:
+        vers = rows_to_list(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver",(aid,)).fetchall())
+        prev = vers[-1]
+        new_ver = len(vers) + 1
+        conn.execute("INSERT INTO versionen (aufgabe_id,ver,status,soll,ist,termin,notes,grund,created_by) VALUES (?,?,?,?,0,?,?,?,?)",
+                     (aid,new_ver,'In Bearbeitung',d.get('soll',prev['soll']),d.get('termin',prev['termin']),'',d.get('grund',''),d.get('created_by','')))
+        conn.execute("UPDATE aufgaben SET status='In Bearbeitung' WHERE id=?", (aid,))
+        conn.execute("INSERT INTO status_history (aufgabe_id,old_status,new_status,changed_by) VALUES (?,?,?,?)",
+                     (aid,'Abgeschlossen','In Bearbeitung (Revision)',d.get('created_by','')))
         conn.commit()
     return jsonify({'ok':True})
 
@@ -419,15 +512,6 @@ def delete_latest_version(aid):
         conn.commit()
     return jsonify({'ok':True})
 
-@app.route('/api/versionen/<int:vid>', methods=['DELETE'])
-def delete_version(vid):
-    with get_db() as conn:
-        conn.execute("DELETE FROM inputs WHERE version_id=?", (vid,))
-        conn.execute("DELETE FROM outputs WHERE version_id=?", (vid,))
-        conn.execute("DELETE FROM versionen WHERE id=?", (vid,))
-        conn.commit()
-    return jsonify({'ok':True})
-
 @app.route('/api/aufgaben/<aid>', methods=['DELETE'])
 def delete_aufgabe(aid):
     with get_db() as conn:
@@ -436,19 +520,8 @@ def delete_aufgabe(aid):
             conn.execute("DELETE FROM inputs WHERE version_id=?", (v['id'],))
             conn.execute("DELETE FROM outputs WHERE version_id=?", (v['id'],))
         conn.execute("DELETE FROM versionen WHERE aufgabe_id=?", (aid,))
+        conn.execute("DELETE FROM status_history WHERE aufgabe_id=?", (aid,))
         conn.execute("DELETE FROM aufgaben WHERE id=?", (aid,))
-        conn.commit()
-    return jsonify({'ok':True})
-
-@app.route('/api/aufgaben/<aid>/revision', methods=['POST'])
-def create_revision(aid):
-    d = request.json
-    with get_db() as conn:
-        vers = rows_to_list(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver",(aid,)).fetchall())
-        prev = vers[-1]
-        new_ver = len(vers) + 1
-        conn.execute("INSERT INTO versionen (aufgabe_id,ver,status,soll,ist,termin,notes,grund,created_by) VALUES (?,?,?,?,0,?,?,?,?)",
-                     (aid,new_ver,'In Bearbeitung',d.get('soll',prev['soll']),d.get('termin',prev['termin']),'',d.get('grund',''),d.get('created_by','')))
         conn.commit()
     return jsonify({'ok':True})
 
@@ -456,7 +529,8 @@ def create_revision(aid):
 @app.route('/api/notifications/<user>')
 def get_notifications(user):
     with get_db() as conn:
-        return jsonify(rows_to_list(conn.execute("SELECT * FROM notifications WHERE user_name=? ORDER BY created_at DESC LIMIT 30",(user,)).fetchall()))
+        return jsonify(rows_to_list(conn.execute(
+            "SELECT * FROM notifications WHERE user_name=? ORDER BY created_at DESC LIMIT 50",(user,)).fetchall()))
 
 @app.route('/api/notifications/<int:nid>/read', methods=['PATCH'])
 def mark_read(nid):
