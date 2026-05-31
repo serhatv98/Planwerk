@@ -276,7 +276,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
     </div>
     <!-- ABT -->
     <div class="tabpanel" id="tabAbt">
-      <table class="utbl"><thead><tr><th>Abteilung / Department</th><th></th></tr></thead><tbody id="aBody"></tbody></table>
+      <div id="abtList"></div>
       <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;display:flex;gap:10px;align-items:flex-end">
         <div class="fg" style="margin:0;flex:1"><label class="fl" id="tAbtName">Abteilungsname</label><input class="fi" id="aName"></div>
         <button class="bsv" id="aSave" style="white-space:nowrap;margin-bottom:0"></button>
@@ -421,7 +421,11 @@ var L={
     termDat:'Fälligkeitsdatum',notizen:'Notizen',inTitle:'📥 Eingangsdaten (Inputs)',outTitle:'📤 Ausgangsdaten (Outputs)',
     revGrund:'Revisionsgrund',neuTermin:'Neues Fälligkeitsdatum',neuSoll:'Neue Soll-Stunden',
     roleLbl:'Rolle',nameLbl:'Name',pwLbl:'Passwort',suchen:'Suchen…',
-    permRead:'Nur lesen',permEdit:'Bearbeiten',permFull:'Alles'
+    permRead:'Nur lesen',permEdit:'Bearbeiten',permFull:'Alles',
+    notifAddedToProj:'Du wurdest zum Projekt hinzugefügt.',
+    notifAddedAsOutput:'Du wurdest als Ausgabe-Empfänger hinzugefügt.',
+    notifDone:'wurde abgeschlossen. Du kannst jetzt beginnen!',
+    abtMember:'Mitglieder',addAbtMember:'Mitglied hinzufügen',noMembers:'Keine Mitglieder'
   },
   en:{
     login:'Login',projekte:'Projects',addProj:'+ Add project',noProj:'No project selected',
@@ -445,7 +449,11 @@ var L={
     termDat:'Due date',notizen:'Notes',inTitle:'📥 Input data',outTitle:'📤 Output data',
     revGrund:'Reason for revision',neuTermin:'New due date',neuSoll:'New planned hours',
     roleLbl:'Role',nameLbl:'Name',pwLbl:'Password',suchen:'Search…',
-    permRead:'Read only',permEdit:'Edit',permFull:'Full access'
+    permRead:'Read only',permEdit:'Edit',permFull:'Full access',
+    notifAddedToProj:'You were added to the project.',
+    notifAddedAsOutput:'You were added as output recipient.',
+    notifDone:'was completed. You can start now!',
+    abtMember:'Members',addAbtMember:'Add member',noMembers:'No members'
   }
 };
 function T(k){return L[lang][k]||k;}
@@ -536,7 +544,7 @@ document.getElementById('btnOut').onclick=function(){
 
 // ── LOAD ALL ──────────────────────────────────────
 async function loadAll(){
-  var [users,abts]=await Promise.all([api('GET','/api/users'),api('GET','/api/abteilungen')]);
+  var [users,abts]=await Promise.all([api('GET','/api/users'),api('GET','/api/abteilungen/with_members')]);
   allU=users;allA=abts;
   // datalists
   var ul=document.getElementById('uList');ul.innerHTML='';
@@ -696,6 +704,7 @@ function openAufgModal(id,proj){
   document.getElementById('fAN').value=a?a.name:'';
   document.getElementById('fAO').value=a?a.owner:'';
   document.getElementById('fAD').value=a?a.dept:'';
+  document.getElementById('fAD').oninput=function(){filterUsersByAbt(this.value);};
   document.getElementById('fAS').value=v?(v.soll||''):'';
   document.getElementById('fAI').value=v?(v.ist||''):'';
   document.getElementById('fAT').value=v?(v.termin||''):'';
@@ -815,7 +824,7 @@ document.getElementById('mMembersCl').onclick=function(){closeModal('mMembers');
 document.getElementById('btnAdm').onclick=function(){loadAdminData();openModal('mAdm');};
 document.getElementById('mAdmCl').onclick=function(){closeModal('mAdm');};
 async function loadAdminData(){
-  var [users,abts]=await Promise.all([api('GET','/api/users'),api('GET','/api/abteilungen')]);
+  var [users,abts]=await Promise.all([api('GET','/api/users'),api('GET','/api/abteilungen/with_members')]);
   allU=users;allA=abts;
   renderUserTable();renderAbtTable();
 }
@@ -844,17 +853,49 @@ function renderUserTable(){
   });
 }
 function renderAbtTable(){
-  var tb=document.getElementById('aBody');tb.innerHTML='';
+  var el=document.getElementById('abtList');el.innerHTML='';
   allA.forEach(function(a){
-    var tr=document.createElement('tr');
-    tr.innerHTML='<td><b>'+a.name+'</b></td>'
-      +'<td><button class="bs bw" style="padding:4px 10px;font-size:11px" data-del="'+a.id+'">×</button></td>';
-    tr.querySelector('[data-del]').onclick=async function(){
+    var members=a.members||[];
+    var div=document.createElement('div');
+    div.style.cssText='background:var(--ice2);border-radius:8px;padding:12px 14px;margin-bottom:10px;border:1px solid var(--border)';
+    div.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+      +'<b style="font-size:13px">'+a.name+'</b>'
+      +'<button class="bs bw" style="padding:3px 8px;font-size:11px;margin-left:auto" data-del="'+a.id+'">× '+T('loesch')+'</button>'
+      +'</div>'
+      +'<div style="font-size:10px;font-family:'DM Mono',monospace;text-transform:uppercase;color:var(--muted);margin-bottom:6px">'+T('abtMember')+'</div>'
+      +'<div id="abtm-'+a.id+'">'
+      +(members.length?members.map(function(m){
+        return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--ice);border-radius:20px;padding:3px 10px;font-size:12px;margin:2px">'
+          +m.user_name
+          +'<button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1" data-rm-abt="'+a.id+'" data-rm-u="'+m.user_name+'">×</button>'
+          +'</span>';
+      }).join(''):'<span style="font-size:12px;color:var(--muted)">'+T('noMembers')+'</span>')
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'
+      +'<select class="fsel" id="abtmsel-'+a.id+'" style="flex:1;padding:6px 10px;font-size:12px">'
+      +allU.map(function(u){return'<option value="'+u.name+'">'+u.name+'</option>';}).join('')
+      +'</select>'
+      +'<button class="bsv" data-add-abt="'+a.id+'" style="padding:7px 14px;font-size:12px;white-space:nowrap">'+T('addAbtMember')+'</button>'
+      +'</div>';
+    
+    div.querySelector('[data-del]').onclick=async function(){
       if(!confirm(a.name+' löschen?'))return;
       await api('DELETE','/api/abteilungen/'+a.id);
       await loadAdminData();await loadAll();
     };
-    tb.appendChild(tr);
+    div.querySelectorAll('[data-rm-abt]').forEach(function(b){
+      b.onclick=async function(){
+        await api('DELETE','/api/abteilungen/'+b.dataset.rmAbt+'/members/'+encodeURIComponent(b.dataset.rmU));
+        await loadAdminData();await loadAll();
+      };
+    });
+    div.querySelector('[data-add-abt]').onclick=async function(){
+      var sel=document.getElementById('abtmsel-'+a.id);
+      if(!sel.value)return;
+      await api('POST','/api/abteilungen/'+a.id+'/members',{user_name:sel.value});
+      await loadAdminData();await loadAll();
+    };
+    el.appendChild(div);
   });
 }
 document.getElementById('nuSave').onclick=async function(){
@@ -909,12 +950,31 @@ async function loadNotifs(){
   var b=document.getElementById('nCnt');b.textContent=u.length;b.style.display=u.length>0?'flex':'none';
   var l=document.getElementById('nList');
   if(!n.length){l.innerHTML='<div class="nem">'+T('notifications')+': leer</div>';return;}
-  l.innerHTML=n.map(function(x){return'<div class="nit'+(x.read?'':' unread')+'">'
-    +'<div>'+x.message+'</div><div class="ntm">'+x.created_at+'</div></div>';}).join('');
+  l.innerHTML=n.map(function(x){
+    var msg=x.message;
+    if(lang==='en'){
+      msg=msg.replace('Du wurdest zum Projekt','You were added to project');
+      msg=msg.replace('hinzugefugt.','.');
+      msg=msg.replace('Du wurdest als Ausgabe-Empfanger hinzugefugt.','You were added as output recipient.');
+      msg=msg.replace('wurde abgeschlossen. Du kannst jetzt beginnen!','was completed. You can start now!');
+      msg=msg.replace('Projekt:','Project:');
+    }
+    return'<div class="nit'+(x.read?'':' unread')+'">'
+    +'<div>'+msg+'</div><div class="ntm">'+x.created_at+'</div></div>';
+  }).join('');
 }
 document.getElementById('nBtn').onclick=function(){var p=document.getElementById('nPanel');p.classList.toggle('open');if(p.classList.contains('open'))loadNotifs();};
 document.getElementById('nRa').onclick=async function(){await api('PATCH','/api/notifications/readall/'+encodeURIComponent(CU));loadNotifs();};
 document.addEventListener('click',function(e){var p=document.getElementById('nPanel');if(!p.contains(e.target)&&!document.getElementById('nBtn').contains(e.target))p.classList.remove('open');});
+
+
+// ── ABT FİLTRE ───────────────────────────────────
+function filterUsersByAbt(abtName){
+  var abt=allA.find(function(a){return a.name===abtName;});
+  var ul=document.getElementById('uList');ul.innerHTML='';
+  var list=abt&&(abt.members||[]).length?abt.members.map(function(m){return{name:m.user_name};}):allU;
+  list.forEach(function(u){var o=document.createElement('option');o.value=u.name;ul.appendChild(o);});
+}
 
 // ── SEARCH ───────────────────────────────────────
 function doSearch(v){var q=v.toLowerCase();document.querySelectorAll('.card').forEach(function(c){var n=c.querySelector('.cnm')?c.querySelector('.cnm').textContent.toLowerCase():'';c.style.display=n.includes(q)?'block':'none';});}
