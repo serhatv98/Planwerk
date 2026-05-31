@@ -55,6 +55,7 @@ def init_db():
             abteilung TEXT,
             bearbeiter TEXT, pruefer TEXT, freigabe TEXT,
             depends_on TEXT,
+            dep_text TEXT DEFAULT '',
             status TEXT DEFAULT 'Ausstehend',
             accepted_by TEXT, accepted_at TEXT,
             est_finish TEXT,
@@ -339,11 +340,11 @@ def create_aufgabe():
     now = datetime.now().isoformat()
     with get_db() as conn:
         conn.execute("""INSERT INTO aufgaben 
-            (id,project_id,name,abteilung,bearbeiter,pruefer,freigabe,depends_on,status,est_finish,created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (id,project_id,name,abteilung,bearbeiter,pruefer,freigabe,depends_on,dep_text,status,est_finish,created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (d['id'],d['project_id'],d['name'],d.get('abteilung',''),
              d.get('bearbeiter',''),d.get('pruefer',''),d.get('freigabe',''),
-             d.get('depends_on',''),d.get('status','Ausstehend'),
+             d.get('depends_on',''),d.get('dep_text',''),d.get('status','Ausstehend'),
              d.get('est_finish',''),d.get('created_by','')))
         
         # Status history
@@ -383,10 +384,10 @@ def update_aufgabe(aid):
     with get_db() as conn:
         old = row_to_dict(conn.execute("SELECT * FROM aufgaben WHERE id=?", (aid,)).fetchone())
         conn.execute("""UPDATE aufgaben SET name=?,abteilung=?,bearbeiter=?,pruefer=?,freigabe=?,
-                     depends_on=?,est_finish=? WHERE id=?""",
+                     depends_on=?,dep_text=?,est_finish=? WHERE id=?""",
                      (d['name'],d.get('abteilung',''),d.get('bearbeiter',''),
                       d.get('pruefer',''),d.get('freigabe',''),
-                      d.get('depends_on',''),d.get('est_finish',''),aid))
+                      d.get('depends_on',''),d.get('dep_text',''),d.get('est_finish',''),aid))
         
         # Versiyon güncelle
         ver = row_to_dict(conn.execute("SELECT * FROM versionen WHERE aufgabe_id=? ORDER BY ver DESC LIMIT 1",(aid,)).fetchone())
