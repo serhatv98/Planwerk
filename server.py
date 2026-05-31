@@ -33,6 +33,12 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS abteilung_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            abteilung_id INTEGER NOT NULL,
+            user_name TEXT NOT NULL,
+            UNIQUE(abteilung_id, user_name)
+        );
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY, name TEXT NOT NULL, desc TEXT,
             owner TEXT, deadline TEXT, color TEXT DEFAULT '#00897b',
@@ -208,7 +214,37 @@ def delete_abteilung(aid):
         conn.commit()
     return jsonify({'ok':True})
 
-# ── PROJECTS ──────────────────────────────────────
+# ── ABT MEMBERS ──────────────────────────────────────────────
+@app.route('/api/abteilungen/<int:aid>/members', methods=['GET'])
+def get_abt_members(aid):
+    with get_db() as conn:
+        return jsonify(rows_to_list(conn.execute("SELECT * FROM abteilung_members WHERE abteilung_id=?", (aid,)).fetchall()))
+
+@app.route('/api/abteilungen/<int:aid>/members', methods=['POST'])
+def add_abt_member(aid):
+    user_name = request.json.get('user_name','').strip()
+    if not user_name: return jsonify({'error':'Name erforderlich'}), 400
+    with get_db() as conn:
+        conn.execute("INSERT OR IGNORE INTO abteilung_members (abteilung_id, user_name) VALUES (?,?)", (aid, user_name))
+        conn.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/abteilungen/<int:aid>/members/<user_name>', methods=['DELETE'])
+def remove_abt_member(aid, user_name):
+    with get_db() as conn:
+        conn.execute("DELETE FROM abteilung_members WHERE abteilung_id=? AND user_name=?", (aid, user_name))
+        conn.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/abteilungen/with_members', methods=['GET'])
+def get_abteilungen_with_members():
+    with get_db() as conn:
+        abts = rows_to_list(conn.execute("SELECT * FROM abteilungen ORDER BY name").fetchall())
+        for a in abts:
+            a['members'] = rows_to_list(conn.execute("SELECT * FROM abteilung_members WHERE abteilung_id=?", (a['id'],)).fetchall())
+        return jsonify(abts)
+
+
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
     user_name = request.args.get('user','')
