@@ -161,12 +161,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
 .empty{text-align:center;padding:60px 20px;color:var(--muted)}
 .ferr{color:var(--coral);font-size:12px;margin-top:6px;display:none}
 @media(max-width:680px){
-  .sidebar{display:none}.ham{display:flex}.sbox{width:100px;font-size:12px}
-  .main{padding:14px}.dg{grid-template-columns:1fr}.sbar{gap:8px}
+  .sidebar{display:none}.ham{display:flex !important}
+  .sbox{width:90px;font-size:11px}.tbtn{padding:5px 8px;font-size:11px}
+  .main{padding:12px}.dg{grid-template-columns:1fr}.sbar{gap:8px}
   .sc{min-width:calc(50% - 4px);flex:none;padding:10px 12px}
-  .ph{flex-direction:column;gap:10px}.bp{width:100%;text-align:center}
+  .sv{font-size:18px}.ph{flex-direction:column;gap:10px}
+  .bp{width:100%;text-align:center;padding:11px}
   .cm{display:none}.fr{grid-template-columns:1fr}
   .ioe{grid-template-columns:1fr 1fr}.ioe>div:nth-child(3){grid-column:1/-1}
+  .topbar{padding:0 12px;gap:6px}.logo{font-size:13px}
+  .ubadge{display:none}
+  .modal{padding:18px 14px}
+  .acts{gap:6px}.bs,.br_{padding:7px 10px;font-size:11px}
+  .chdr{padding:12px 14px;gap:8px}
+  .cnm{font-size:13px}
+  .ph>div:first-child .pt{font-size:16px}
+  .npanel{right:8px;width:calc(100vw - 16px)}
+}
+@media(max-width:380px){
+  .sbox{width:70px;font-size:10px}
+  .lbg{padding:4px 8px;font-size:11px}
 }
 </style>
 </head>
@@ -526,6 +540,9 @@ document.getElementById('cpBtn').onclick=async function(){
 function showErr(id,msg){var el=document.getElementById(id);el.textContent=msg;el.style.display='block';}
 
 function startApp(){
+  // Oturumu kaydet
+  sessionStorage.setItem('pw_user', CU);
+  sessionStorage.setItem('pw_role', CR);
   document.getElementById('scLogin').style.display='none';
   document.getElementById('scCpw').style.display='none';
   document.getElementById('app').style.display='block';
@@ -537,6 +554,8 @@ function startApp(){
 }
 document.getElementById('btnOut').onclick=function(){
   CU=null;CR=null;pid=null;clearInterval(notifT);
+  sessionStorage.removeItem('pw_user');
+  sessionStorage.removeItem('pw_role');
   document.getElementById('app').style.display='none';
   document.getElementById('scLogin').style.display='flex';
   document.getElementById('lName').value='';document.getElementById('lPw').value='';
@@ -990,6 +1009,15 @@ document.getElementById('dov').onclick=closeDrawer;
 function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('dov').classList.remove('open');}
 
 // ── INIT ─────────────────────────────────────────
+// Sayfa yenilenince oturumu geri yükle
+(function(){
+  var su=sessionStorage.getItem('pw_user');
+  var sr=sessionStorage.getItem('pw_role');
+  if(su&&sr){
+    CU=su;CR=sr;
+    startApp();
+  }
+})();
 setLang('de');
 </script>
 </body>
