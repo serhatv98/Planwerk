@@ -211,11 +211,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
 
 <!-- LOGIN -->
 <div class="screen" id="scLogin">
+  <div style="position:fixed;top:12px;right:16px;z-index:10">
+    <div class="ltog">
+      <button class="lbg active" id="loginDE" onclick="setLoginLang('de')" style="color:rgba(255,255,255,.7)">DE</button>
+      <button class="lbg" id="loginEN" onclick="setLoginLang('en')" style="color:rgba(255,255,255,.7)">EN</button>
+    </div>
+  </div>
   <div class="box">
     <div class="logo-big">Plan<span>Werk</span></div>
-    <div class="sub">Aufgabenplanung · designed by S.Varol</div>
-    <div class="lf"><label class="ll">Name</label><input class="li" id="lName" autocomplete="off"></div>
-    <div class="lf"><label class="ll">Passwort</label><input class="li" type="password" id="lPw"></div>
+    <div class="sub">Aufgabenplanung &middot; </div>
+    <div class="lf"><label class="ll" id="lLblName">Name</label><input class="li" id="lName" autocomplete="off"></div>
+    <div class="lf"><label class="ll" id="lLblPw">Passwort</label><input class="li" type="password" id="lPw"></div>
     <div class="lerr" id="lErr"></div>
     <button class="lbtn" id="lBtn">Anmelden</button>
   </div>
@@ -238,7 +244,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
 <!-- ACCEPT MODAL -->
 <div class="overlay" id="mAccept">
   <div class="modal msm">
-    <div class="mtt">✅ Aufgabe annehmen</div>
+    <div class="mtt">OK Aufgabe annehmen</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:16px" id="mAcceptDesc"></div>
     <div class="fr3">
       <div class="fg"><label class="fl">Bearbeiter</label><input class="fi" id="acBearbeiter" list="uList" autocomplete="off"></div>
@@ -483,6 +489,16 @@ function formatDuration(ms){
 }
 
 //  LANG 
+function setLoginLang(l){
+  lang=l;
+  var de=l==='de';
+  document.getElementById('loginDE').classList.toggle('active',de);
+  document.getElementById('loginEN').classList.toggle('active',!de);
+  document.getElementById('lLblName').textContent=de?'Name':'Name';
+  document.getElementById('lLblPw').textContent=de?'Passwort':'Password';
+  document.getElementById('lBtn').textContent=de?'Anmelden':'Login';
+}
+
 function setLang(l){
   lang=l;
   document.querySelectorAll('.lbg').forEach(function(b){b.classList.toggle('active',b.textContent===l.toUpperCase());});
@@ -740,6 +756,9 @@ function buildCard(a,proj,perm){
 
   // Dep gsterge
   var depBadge='';
+  if(a.dep_text&&!depAufg){
+    depBadge='<span style="font-size:10px;padding:2px 8px;border-radius:10px;margin-left:6px;background:#e8edf8;color:#4a5580">'+a.dep_text+'</span>';
+  }
   if(depAufg){
     depBadge='<span style="font-size:10px;padding:2px 8px;border-radius:10px;margin-left:6px;'
       +(depStatus==='ready'?'background:#e8f5e9;color:#2e7d32">'+'\u2713 '+depAufg.name:'background:#fff3e0;color:#e65100">\u23f3 '+depAufg.name)
@@ -754,9 +773,9 @@ function buildCard(a,proj,perm){
     +'<span class="pill '+scl+'">'+tSt(st)+'</span>'
     +'<div class="cnm">'+a.name+(vn>1?'<span class="rbg">v'+vn+'</span>':'')+depBadge+'</div>'
     +'<div class="cm">'
-    +(a.abteilung?'<span class="chip">\u1f3e2 '+a.abteilung+'</span>':'')
-    +(a.bearbeiter?'<span class="chip">\u1f464 '+a.bearbeiter+'</span>':'')
-    +(a.est_finish?'<span class="chip">\u1f4c5 '+a.est_finish+'</span>':'')
+    +(a.abteilung?'<span class="chip"> '+a.abteilung+'</span>':'')
+    +(a.bearbeiter?'<span class="chip"> '+a.bearbeiter+'</span>':'')
+    +(a.est_finish?'<span class="chip"> '+a.est_finish+'</span>':'')
     +'</div>'
     +'<span class="chev">\u25be</span></div>'
     +'<div class="cbody">'
@@ -825,6 +844,7 @@ function openAufgModal(id,proj){
   document.getElementById('fAS').value=v?v.soll||'':'';
   document.getElementById('fAT').value=a?a.est_finish||'':'';
   document.getElementById('fAZ').value=v?v.notes||'':'';
+  document.getElementById('fADepText').value=a?a.dep_text||'':'';
 
   // Ba\u011f\u0131ml\u0131l\u0131k se\u00e7ene\u011fi
   var depSel=document.getElementById('fADep');
@@ -855,6 +875,7 @@ document.getElementById('mAufgSv').onclick=async function(){
     soll:parseFloat(document.getElementById('fAS').value)||0,
     est_finish:document.getElementById('fAT').value,
     depends_on:document.getElementById('fADep').value,
+    dep_text:document.getElementById('fADepText').value.trim(),
     notes:document.getElementById('fAZ').value.trim(),
     inputs:getIOList('inList','input'),
     outputs:getIOList('outList','output')
