@@ -213,7 +213,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--ice2);color:var(--navy);m
 <div class="screen" id="scLogin">
   <div class="box">
     <div class="logo-big">Plan<span>Werk</span></div>
-    <div class="sub">Aufgabenplanung </div>
+    <div class="sub">Aufgabenplanung · designed by S.Varol</div>
     <div class="lf"><label class="ll">Name</label><input class="li" id="lName" autocomplete="off"></div>
     <div class="lf"><label class="ll">Passwort</label><input class="li" type="password" id="lPw"></div>
     <div class="lerr" id="lErr"></div>
@@ -482,14 +482,14 @@ function formatDuration(ms){
   return h+'h';
 }
 
-// ── LANG ──────────────────────────────────────────
+//  LANG 
 function setLang(l){
   lang=l;
   document.querySelectorAll('.lbg').forEach(function(b){b.classList.toggle('active',b.textContent===l.toUpperCase());});
   if(pid)renderProjView();
 }
 
-// ── LOGIN ──────────────────────────────────────────
+//  LOGIN 
 document.getElementById('lBtn').onclick=doLogin;
 document.getElementById('lName').onkeydown=function(e){if(e.key==='Enter')document.getElementById('lPw').focus();};
 document.getElementById('lPw').onkeydown=function(e){if(e.key==='Enter')doLogin();};
@@ -522,7 +522,7 @@ document.getElementById('cpBtn').onclick=async function(){
   var n1=document.getElementById('cpNew').value;
   var n2=document.getElementById('cpNew2').value;
   hideErr('cpErr');
-  if(n1!==n2){showErr('cpErr','Passwörter stimmen nicht überein.');return;}
+  if(n1!==n2){showErr('cpErr','Passw\u00f6rter stimmen nicht \u00fcberein.');return;}
   if(n1.length<4){showErr('cpErr','Min. 4 Zeichen.');return;}
   var res=await api('POST','/api/change_password',{name:CU,old_password:old,new_password:n1});
   if(res.error){showErr('cpErr',res.error);return;}
@@ -535,7 +535,7 @@ function startApp(){
   document.getElementById('scLogin').style.display='none';
   document.getElementById('scCpw').style.display='none';
   document.getElementById('app').style.display='block';
-  document.getElementById('uBadge').textContent=CU+(CR==='admin'?' 👑':'');
+  document.getElementById('uBadge').textContent=CU+(CR==='admin'?' \u1f451':'');
   if(CR==='admin')document.getElementById('btnAdm').style.display='block';
   loadAll();
   notifT=setInterval(loadNotifs,20000);loadNotifs();
@@ -549,7 +549,7 @@ document.getElementById('btnOut').onclick=function(){
   document.getElementById('lName').value='';document.getElementById('lPw').value='';
 };
 
-// ── LOAD ALL ──────────────────────────────────────
+//  LOAD ALL 
 async function loadAll(){
   var res=await Promise.all([api('GET','/api/users'),api('GET','/api/abteilungen/with_members')]);
   allU=res[0];allA=res[1];
@@ -568,7 +568,7 @@ function filterUsersByAbt(abtName){
   list.forEach(function(m){var o=document.createElement('option');o.value=m.user_name||m.name;ul.appendChild(o);});
 }
 
-// ── PROJECTS ──────────────────────────────────────
+//  PROJECTS 
 async function loadProjects(){
   allP=await api('GET','/api/projects?user='+encodeURIComponent(CU)+'&role='+CR);
   renderSidebars();
@@ -592,7 +592,7 @@ function renderSidebars(){
 async function renderProjView(){
   document.getElementById('noProj').style.display='none';
   document.getElementById('pView').style.display='block';
-  document.getElementById('pView').innerHTML='<div class="empty"><div style="font-size:30px">⏳</div></div>';
+  document.getElementById('pView').innerHTML='<div class="empty"><div style="font-size:30px">\u23f3</div></div>';
   var proj=await api('GET','/api/projects/'+pid);
   if(proj.error){document.getElementById('pView').innerHTML='<div class="empty">Fehler beim Laden.</div>';return;}
   renderProject(proj);
@@ -600,7 +600,7 @@ async function renderProjView(){
 
 function renderProject(proj){
   var perm=myPerm(proj);
-  if(!perm.read){document.getElementById('pView').innerHTML='<div class="empty"><div style="font-size:44px">🔒</div><div style="margin-top:14px">Kein Zugriff</div></div>';return;}
+  if(!perm.read){document.getElementById('pView').innerHTML='<div class="empty"><div style="font-size:44px">\u1f512</div><div style="margin-top:14px">Kein Zugriff</div></div>';return;}
 
   var aufgaben=proj.aufgaben||[];
   var done=aufgaben.filter(function(a){return a.status==='Abgeschlossen';}).length;
@@ -608,12 +608,12 @@ function renderProject(proj){
   var aus=aufgaben.filter(function(a){return a.status==='Ausstehend';}).length;
 
   var html='<div class="ph">'
-    +'<div><div class="pt">'+proj.name+' <span style="font-size:14px;color:var(--muted);font-weight:400">— '+(proj.desc||'')+'</span></div>'
-    +'<div class="pm">Verantwortlich: '+(proj.owner||'—')+' · Endtermin: '+(proj.deadline||'—')+'</div></div>'
+    +'<div><div class="pt">'+proj.name+' <span style="font-size:14px;color:var(--muted);font-weight:400">\u2014 '+(proj.desc||'')+'</span></div>'
+    +'<div class="pm">Verantwortlich: '+(proj.owner||'\u2014')+' \u00b7 Endtermin: '+(proj.deadline||'\u2014')+'</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +(CR==='admin'?'<button class="bs" id="btnMem" style="border-color:var(--navy);color:var(--navy)">👥</button>':'')
-    +(perm.edit?'<button class="bs" id="btnEP" style="border-color:var(--teal);color:var(--teal)">✏</button>':'')
-    +(CR==='admin'?'<button class="bs bd" id="btnDP">🗑</button>':'')
+    +(CR==='admin'?'<button class="bs" id="btnMem" style="border-color:var(--navy);color:var(--navy)">\u1f465</button>':'')
+    +(perm.edit?'<button class="bs" id="btnEP" style="border-color:var(--teal);color:var(--teal)">\u270f</button>':'')
+    +(CR==='admin'?'<button class="bs bd" id="btnDP">\u1f5d1</button>':'')
     +(perm.edit?'<button class="bp" id="btnAA">+ Aufgabe</button>':'')
     +'</div></div>'
     +'<div class="sbar">'
@@ -633,7 +633,7 @@ function renderProject(proj){
   if(document.getElementById('btnAA'))document.getElementById('btnAA').onclick=function(){openAufgModal(null,proj);};
   if(document.getElementById('btnEP'))document.getElementById('btnEP').onclick=function(){openProjModal(proj);};
   if(document.getElementById('btnDP'))document.getElementById('btnDP').onclick=async function(){
-    if(!confirm(proj.name+' löschen?'))return;
+    if(!confirm(proj.name+' l\u00f6schen?'))return;
     await api('DELETE','/api/projects/'+pid);pid=null;await loadProjects();
   };
   if(document.getElementById('btnMem'))document.getElementById('btnMem').onclick=function(){openMembersModal(proj);};
@@ -648,7 +648,7 @@ function renderProject(proj){
   });
   document.querySelectorAll('.be').forEach(function(b){b.onclick=function(e){e.stopPropagation();openAufgModal(b.dataset.id,proj);};});
   document.querySelectorAll('.br_btn').forEach(function(b){b.onclick=function(e){e.stopPropagation();revAid=b.dataset.id;document.getElementById('fRG').value='';document.getElementById('fRT').value='';document.getElementById('fRS').value='';openModal('mRev');};});
-  document.querySelectorAll('.bda2').forEach(function(b){b.onclick=function(e){e.stopPropagation();if(!perm.del)return;if(!confirm('Aufgabe löschen?'))return;api('DELETE','/api/aufgaben/'+b.dataset.id).then(function(){renderProjView();});};});
+  document.querySelectorAll('.bda2').forEach(function(b){b.onclick=function(e){e.stopPropagation();if(!perm.del)return;if(!confirm('Aufgabe l\u00f6schen?'))return;api('DELETE','/api/aufgaben/'+b.dataset.id).then(function(){renderProjView();});};});
   document.querySelectorAll('.btn-accept').forEach(function(b){b.onclick=function(e){e.stopPropagation();openAcceptModal(b.dataset.id,proj);};});
 
   document.querySelectorAll('.card').forEach(function(c){
@@ -660,7 +660,7 @@ function buildCard(a,proj,perm){
   var st=a.status;
   var scl=stCl(st);
 
-  // Bağımlı görev durumu
+  // Baml grev durumu
   var depStatus='';
   var depAufg=null;
   if(a.depends_on){
@@ -677,37 +677,37 @@ function buildCard(a,proj,perm){
   var inputs=v?v.inputs||[]:[];
   var outputs=v?v.outputs||[]:[];
 
-  // Input durumlarını kontrol et
+  // Input durumlarn kontrol et
   var inpHtml=inputs.length===0?'<div class="ioempty">Keine Inputs</div>':inputs.map(function(inp){
     var isReady=!!inp.fertig;
     var depA=(proj.aufgaben||[]).find(function(x){return x.id===inp.von_aufgabe_id;});
-    var depName=depA?depA.name:(inp.von_abt||'—');
+    var depName=depA?depA.name:(inp.von_abt||'\u2014');
     return '<div class="ioitem">'
       +'<div class="io-status '+(isReady?'io-ready':'io-waiting')+'"></div>'
       +'<div class="ionm">'+inp.name+'</div>'
-      +'<div class="iometa">'+depName+(isReady?' ✓':' ⏳')+'</div>'
+      +'<div class="iometa">'+depName+(isReady?' \u2713':' \u23f3')+'</div>'
       +'</div>';
   }).join('');
 
   var outHtml=outputs.length===0?'<div class="ioempty">Keine Outputs</div>':outputs.map(function(out){
     var depA=(proj.aufgaben||[]).find(function(x){return x.id===out.fuer_aufgabe_id;});
-    var fuerName=depA?depA.name:(out.fuer_abt||'—');
+    var fuerName=depA?depA.name:(out.fuer_abt||'\u2014');
     return '<div class="ioitem">'
       +'<div class="ionm">'+out.name+'</div>'
-      +'<div class="iometa">→ '+fuerName+(out.abgeschlossen_at?' · '+out.abgeschlossen_at.substring(0,10):'')+'</div>'
+      +'<div class="iometa">\u2192 '+fuerName+(out.abgeschlossen_at?' \u00b7 '+out.abgeschlossen_at.substring(0,10):'')+'</div>'
       +'</div>';
   }).join('');
 
-  // Kişiler
-  var personsHtml='<div class="person-row"><span class="person-role">Bearbeiter</span><span class="person-name">'+(a.bearbeiter||'—')+'</span></div>'
-    +'<div class="person-row"><span class="person-role">Prüfer</span><span class="person-name">'+(a.pruefer||'—')+'</span></div>'
-    +'<div class="person-row"><span class="person-role">Freigabe</span><span class="person-name">'+(a.freigabe||'—')+'</span></div>';
+  // Kiiler
+  var personsHtml='<div class="person-row"><span class="person-role">Bearbeiter</span><span class="person-name">'+(a.bearbeiter||'\u2014')+'</span></div>'
+    +'<div class="person-row"><span class="person-role">Pr\u00fcfer</span><span class="person-name">'+(a.pruefer||'\u2014')+'</span></div>'
+    +'<div class="person-row"><span class="person-role">Freigabe</span><span class="person-name">'+(a.freigabe||'\u2014')+'</span></div>';
 
-  // Status geçmişi
+  // Status gemii
   var hist=a.status_history||[];
   var histHtml='';
   if(hist.length>0){
-    histHtml='<div class="sh-wrap"><div class="sh-title">📊 Status-Verlauf</div>'
+    histHtml='<div class="sh-wrap"><div class="sh-title">\u1f4ca Status-Verlauf</div>'
       +hist.map(function(h,i){
         var dur='';
         if(i>0){
@@ -717,7 +717,7 @@ function buildCard(a,proj,perm){
         }
         return '<div class="sh-row">'
           +'<span class="sh-status pill '+stCl(h.new_status)+'" style="font-size:10px">'+tSt(h.new_status)+'</span>'
-          +'<span class="sh-by">'+( h.changed_by||'—')+'</span>'
+          +'<span class="sh-by">'+( h.changed_by||'\u2014')+'</span>'
           +'<span class="sh-time">'+h.changed_at.substring(0,16).replace('T',' ')+'</span>'
           +(dur?'<span class="sh-dur">'+dur+'</span>':'')
           +'</div>';
@@ -732,17 +732,17 @@ function buildCard(a,proj,perm){
     var isMyAbt=myAbts.some(function(ab){return ab.name===a.abteilung;});
     if(isMyAbt||CR==='admin'){
       acceptBanner='<div class="accept-banner">'
-        +'<div class="accept-banner-text">⏳ Diese Aufgabe wartet auf Bestätigung von <b>'+a.abteilung+'</b></div>'
-        +'<div class="accept-banner-btns"><button class="bp btn-accept" data-id="'+a.id+'">✅ Annehmen</button></div>'
+        +'<div class="accept-banner-text">\u23f3 Diese Aufgabe wartet auf Best\u00e4tigung von <b>'+a.abteilung+'</b></div>'
+        +'<div class="accept-banner-btns"><button class="bp btn-accept" data-id="'+a.id+'">\u2705 Annehmen</button></div>'
         +'</div>';
     }
   }
 
-  // Dep gösterge
+  // Dep gsterge
   var depBadge='';
   if(depAufg){
     depBadge='<span style="font-size:10px;padding:2px 8px;border-radius:10px;margin-left:6px;'
-      +(depStatus==='ready'?'background:#e8f5e9;color:#2e7d32'>✓ '+depAufg.name:'background:#fff3e0;color:#e65100">⏳ '+depAufg.name)
+      +(depStatus==='ready'?'background:#e8f5e9;color:#2e7d32">'+'\u2713 '+depAufg.name:'background:#fff3e0;color:#e65100">\u23f3 '+depAufg.name)
       +'</span>';
   }
 
@@ -754,18 +754,18 @@ function buildCard(a,proj,perm){
     +'<span class="pill '+scl+'">'+tSt(st)+'</span>'
     +'<div class="cnm">'+a.name+(vn>1?'<span class="rbg">v'+vn+'</span>':'')+depBadge+'</div>'
     +'<div class="cm">'
-    +(a.abteilung?'<span class="chip">🏢 '+a.abteilung+'</span>':'')
-    +(a.bearbeiter?'<span class="chip">👤 '+a.bearbeiter+'</span>':'')
-    +(a.est_finish?'<span class="chip">📅 '+a.est_finish+'</span>':'')
+    +(a.abteilung?'<span class="chip">\u1f3e2 '+a.abteilung+'</span>':'')
+    +(a.bearbeiter?'<span class="chip">\u1f464 '+a.bearbeiter+'</span>':'')
+    +(a.est_finish?'<span class="chip">\u1f4c5 '+a.est_finish+'</span>':'')
     +'</div>'
-    +'<span class="chev">▾</span></div>'
+    +'<span class="chev">\u25be</span></div>'
     +'<div class="cbody">'
     +acceptBanner
     +'<div class="dg">'
-    +'<div class="ds"><div class="dt">📥 Eingangsdaten</div>'+inpHtml+'</div>'
-    +'<div class="ds"><div class="dt">📤 Ausgangsdaten</div>'+outHtml+'</div>'
-    +'<div class="ds"><div class="dt">👥 Personen</div>'+personsHtml
-    +(a.est_finish?'<div class="hr" style="margin-top:8px"><span class="hrl">Tahmini Bitiş</span><span class="hrv" style="font-size:11px">'+a.est_finish+'</span></div>':'')
+    +'<div class="ds"><div class="dt">\u1f4e5 Eingangsdaten</div>'+inpHtml+'</div>'
+    +'<div class="ds"><div class="dt">\u1f4e4 Ausgangsdaten</div>'+outHtml+'</div>'
+    +'<div class="ds"><div class="dt">\u1f465 Personen</div>'+personsHtml
+    +(a.est_finish?'<div class="hr" style="margin-top:8px"><span class="hrl">Tahmini Biti\u015f</span><span class="hrv" style="font-size:11px">'+a.est_finish+'</span></div>':'')
     +(v&&v.soll?'<div class="hr"><span class="hrl">Soll-Stunden</span><span class="hrv">'+v.soll+'h</span></div>':'')
     +(v&&v.notes?'<div style="margin-top:8px;font-size:12px;color:var(--muted);font-style:italic">'+v.notes+'</div>':'')
     +'</div></div>'
@@ -774,9 +774,9 @@ function buildCard(a,proj,perm){
     +(canEdit?'<select class="stsel" data-id="'+a.id+'">'
       +STATUSES.map(function(s){return'<option value="'+s+'"'+(s===st?' selected':'')+'>'+tSt(s)+'</option>';}).join('')
       +'</select>':'')
-    +(canEdit?'<button class="bs be" data-id="'+a.id+'">✏ Bearbeiten</button>':'')
-    +(canEdit&&st==='Abgeschlossen'?'<button class="br_ br_btn" data-id="'+a.id+'">🔄 Revision</button>':'')
-    +(canDel?'<button class="bs bd bda2" data-id="'+a.id+'">🗑 Löschen</button>':'')
+    +(canEdit?'<button class="bs be" data-id="'+a.id+'">\u270f Bearbeiten</button>':'')
+    +(canEdit&&st==='Abgeschlossen'?'<button class="br_ br_btn" data-id="'+a.id+'">\u1f504 Revision</button>':'')
+    +(canDel?'<button class="bs bd bda2" data-id="'+a.id+'">\u1f5d1 L\u00f6schen</button>':'')
     +'</div></div></div>';
 }
 
@@ -785,7 +785,7 @@ async function doSt(id,status){
   renderProjView();loadNotifs();
 }
 
-// ── ACCEPT MODAL ──────────────────────────────────
+// \u2500\u2500 ACCEPT MODAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function openAcceptModal(id,proj){
   acceptAid=id;
   var a=(proj.aufgaben||[]).find(function(x){return x.id===id;});
@@ -811,7 +811,7 @@ document.getElementById('mAcceptSv').onclick=async function(){
 };
 document.getElementById('mAcceptCa').onclick=function(){closeModal('mAccept');};
 
-// ── AUFGABE MODAL ──────────────────────────────────
+// \u2500\u2500 AUFGABE MODAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function openAufgModal(id,proj){
   editAid=id;
   var a=id?(proj.aufgaben||[]).find(function(x){return x.id===id;}):null;
@@ -826,9 +826,9 @@ function openAufgModal(id,proj){
   document.getElementById('fAT').value=a?a.est_finish||'':'';
   document.getElementById('fAZ').value=v?v.notes||'':'';
 
-  // Bağımlılık seçeneği
+  // Ba\u011f\u0131ml\u0131l\u0131k se\u00e7ene\u011fi
   var depSel=document.getElementById('fADep');
-  depSel.innerHTML='<option value="">— Keine Abhängigkeit —</option>';
+  depSel.innerHTML='<option value="">\u2014 Keine Abh\u00e4ngigkeit \u2014</option>';
   (proj.aufgaben||[]).forEach(function(x){
     if(x.id!==id){
       var opt=document.createElement('option');
@@ -877,7 +877,7 @@ function buildIOList(cid,type,entries,proj){
 function addIORow(cid,type,data,proj){
   var c=document.getElementById(cid);
   var div=document.createElement('div');div.className='ioe';
-  // Görev listesi için datalist
+  // G\u00f6rev listesi i\u00e7in datalist
   var aufgOptId='aufg_dl_'+Date.now()+'_'+Math.random().toString(36).substr(2,5);
   var aufgOpts='';
   if(proj){
@@ -889,12 +889,12 @@ function addIORow(cid,type,data,proj){
   var abtVal=data?(type==='input'?data.von_abt||'':data.fuer_abt||''):'';
 
   div.innerHTML='<div class="fg" style="margin:0"><label class="fl">Dokument/Name</label><input class="fi" value="'+nameVal+'" placeholder="Dateiname"></div>'
-    +'<div class="fg" style="margin:0"><label class="fl">'+(type==='input'?'Von Aufgabe':'Für Aufgabe')+'</label>'
-    +'<select class="fsel" style="font-size:12px"><option value="">— Keine —</option>'+aufgOpts+'</select></div>'
+    +'<div class="fg" style="margin:0"><label class="fl">'+(type==='input'?'Von Aufgabe':'F\u00fcr Aufgabe')+'</label>'
+    +'<select class="fsel" style="font-size:12px"><option value="">\u2014 Keine \u2014</option>'+aufgOpts+'</select></div>'
     +'<div class="fg" style="margin:0"><label class="fl">Abteilung</label><input class="fi" list="aList" value="'+abtVal+'" autocomplete="off"></div>'
-    +'<button class="iorm" type="button">×</button>';
+    +'<button class="iorm" type="button">\u00d7</button>';
 
-  // Seçili değeri ayarla
+  // Se\u00e7ili de\u011feri ayarla
   var sel=div.querySelector('select');
   if(aufgId)sel.value=aufgId;
 
@@ -916,7 +916,7 @@ function getIOList(cid,type){
 document.getElementById('btnAI').onclick=function(){addIORow('inList','input',null,null);};
 document.getElementById('btnAO').onclick=function(){addIORow('outList','output',null,null);};
 
-// ── REVISION ──────────────────────────────────────
+// \u2500\u2500 REVISION \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 document.getElementById('mRevSv').onclick=async function(){
   await api('POST','/api/aufgaben/'+revAid+'/revision',{
     soll:parseFloat(document.getElementById('fRS').value)||0,
@@ -928,7 +928,7 @@ document.getElementById('mRevSv').onclick=async function(){
 };
 document.getElementById('mRevCa').onclick=function(){closeModal('mRev');};
 
-// ── PROJEKT MODAL ──────────────────────────────────
+// \u2500\u2500 PROJEKT MODAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 document.getElementById('sAdd').onclick=function(){openProjModal(null);};
 document.getElementById('dAdd').onclick=function(){openProjModal(null);closeDrawer();};
 function openProjModal(proj){
@@ -949,11 +949,11 @@ document.getElementById('mProjSv').onclick=async function(){
 };
 document.getElementById('mProjCa').onclick=function(){closeModal('mProj');};
 
-// ── MEMBERS MODAL ──────────────────────────────────
+// \u2500\u2500 MEMBERS MODAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var curProj=null;
 function openMembersModal(proj){
   curProj=proj;
-  document.getElementById('mMembersTitle').textContent='👥 '+proj.name+' – Zugang verwalten';
+  document.getElementById('mMembersTitle').textContent='\u1f465 '+proj.name+' \u2013 Zugang verwalten';
   renderMemberList(proj);
   var sel=document.getElementById('mUserSel');sel.innerHTML='';
   allU.forEach(function(u){var o=document.createElement('option');o.value=u.name;o.textContent=u.name;sel.appendChild(o);});
@@ -966,7 +966,7 @@ function renderMemberList(proj){
     var pt=m.can_delete?'Alles':(m.can_edit?'Bearbeiten':'Nur lesen');
     d.innerHTML='<span style="font-weight:500">'+m.user_name+'</span>'
       +'<span style="font-size:11px;color:var(--muted);font-family:monospace">'+pt+'</span>'
-      +'<button class="bs bw" style="padding:4px 10px;font-size:11px;margin-left:auto" data-un="'+m.user_name+'">× Entfernen</button>';
+      +'<button class="bs bw" style="padding:4px 10px;font-size:11px;margin-left:auto" data-un="'+m.user_name+'">\u00d7 Entfernen</button>';
     d.querySelector('button').onclick=async function(){
       await api('DELETE','/api/projects/'+proj.id+'/members/'+encodeURIComponent(m.user_name));
       var upd=await api('GET','/api/projects/'+proj.id);curProj=upd;renderMemberList(upd);renderProjView();
@@ -978,14 +978,14 @@ function renderMemberList(proj){
 document.getElementById('mMembSave').onclick=async function(){
   var un=document.getElementById('mUserSel').value;
   var perm=document.getElementById('mPermSel').value;
-  if(!un){showErr('mMembErr','Benutzer auswählen.');return;}
+  if(!un){showErr('mMembErr','Benutzer ausw\u00e4hlen.');return;}
   await api('POST','/api/projects/'+curProj.id+'/members',{user_name:un,can_edit:perm!=='read',can_delete:perm==='delete'});
   var upd=await api('GET','/api/projects/'+curProj.id);curProj=upd;renderMemberList(upd);
   hideErr('mMembErr');renderProjView();loadNotifs();
 };
 document.getElementById('mMembersCl').onclick=function(){closeModal('mMembers');};
 
-// ── ADMIN MODAL ────────────────────────────────────
+// \u2500\u2500 ADMIN MODAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 document.getElementById('btnAdm').onclick=function(){loadAdminData();openModal('mAdm');};
 document.getElementById('mAdmCl').onclick=function(){closeModal('mAdm');};
 
@@ -1005,17 +1005,17 @@ function renderUserTable(){
     var tr=document.createElement('tr');
     tr.innerHTML='<td><b>'+u.name+'</b></td>'
       +'<td><span class="rbadge2 '+(u.role==='admin'?'ra':'ru')+'">'+u.role+'</span></td>'
-      +'<td><span style="font-size:11px;color:'+(u.must_change_pw?'var(--amber)':'var(--muted)')+'">'+( u.must_change_pw?'⚠ PW ändern':'✓ OK')+'</span></td>'
+      +'<td><span style="font-size:11px;color:'+(u.must_change_pw?'var(--amber)':'var(--muted)')+'">'+( u.must_change_pw?'\u26a0 PW \u00e4ndern':'\u2713 OK')+'</span></td>'
       +'<td style="display:flex;gap:6px">'
-      +'<button class="bs" style="padding:4px 10px;font-size:11px" data-reset="'+u.name+'">🔑</button>'
-      +'<button class="bs bw" style="padding:4px 10px;font-size:11px" data-del="'+u.name+'">×</button></td>';
+      +'<button class="bs" style="padding:4px 10px;font-size:11px" data-reset="'+u.name+'">\u1f511</button>'
+      +'<button class="bs bw" style="padding:4px 10px;font-size:11px" data-del="'+u.name+'">\u00d7</button></td>';
     tr.querySelector('[data-reset]').onclick=async function(){
-      var pw=prompt('Neues Passwort für '+u.name+':');if(!pw)return;
+      var pw=prompt('Neues Passwort f\u00fcr '+u.name+':');if(!pw)return;
       await api('POST','/api/users/'+encodeURIComponent(u.name)+'/reset_password',{password:pw});
-      await loadAdminData();alert('✓ Passwort zurückgesetzt.');
+      await loadAdminData();alert('\u2713 Passwort zur\u00fcckgesetzt.');
     };
     tr.querySelector('[data-del]').onclick=async function(){
-      if(!confirm(u.name+' löschen?'))return;
+      if(!confirm(u.name+' l\u00f6schen?'))return;
       await api('DELETE','/api/users/'+encodeURIComponent(u.name));
       await loadAdminData();
     };
@@ -1031,23 +1031,23 @@ function renderAbtList(){
     div.style.cssText='background:var(--ice2);border-radius:8px;padding:12px 14px;margin-bottom:10px;border:1px solid var(--border)';
     div.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
       +'<b style="font-size:13px">'+a.name+'</b>'
-      +'<button class="bs bw" style="padding:3px 8px;font-size:11px;margin-left:auto" data-del="'+a.id+'">×</button></div>'
+      +'<button class="bs bw" style="padding:3px 8px;font-size:11px;margin-left:auto" data-del="'+a.id+'">\u00d7</button></div>'
       +'<div style="font-size:10px;font-family:monospace;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Mitglieder</div>'
       +'<div id="abtm-'+a.id+'">'
       +(members.length?members.map(function(m){
         return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--ice);border-radius:20px;padding:3px 10px;font-size:12px;margin:2px">'
           +m.user_name
-          +'<button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px" data-rm-abt="'+a.id+'" data-rm-u="'+m.user_name+'">×</button></span>';
+          +'<button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px" data-rm-abt="'+a.id+'" data-rm-u="'+m.user_name+'">\u00d7</button></span>';
       }).join(''):'<span style="font-size:12px;color:var(--muted)">Keine Mitglieder</span>')
       +'</div>'
       +'<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'
       +'<select class="fsel" id="abtmsel-'+a.id+'" style="flex:1;padding:6px 10px;font-size:12px">'
       +allU.map(function(u){return'<option value="'+u.name+'">'+u.name+'</option>';}).join('')
       +'</select>'
-      +'<button class="bsv" data-add-abt="'+a.id+'" style="padding:7px 14px;font-size:12px;white-space:nowrap">+ Hinzufügen</button>'
+      +'<button class="bsv" data-add-abt="'+a.id+'" style="padding:7px 14px;font-size:12px;white-space:nowrap">+ Hinzuf\u00fcgen</button>'
       +'</div>';
     div.querySelector('[data-del]').onclick=async function(){
-      if(!confirm(a.name+' löschen?'))return;
+      if(!confirm(a.name+' l\u00f6schen?'))return;
       await api('DELETE','/api/abteilungen/'+a.id);await loadAdminData();
     };
     div.querySelectorAll('[data-rm-abt]').forEach(function(b){
@@ -1090,7 +1090,7 @@ document.querySelectorAll('.tab').forEach(function(t){
   };
 });
 
-// ── CHANGE PW ─────────────────────────────────────
+// \u2500\u2500 CHANGE PW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 document.getElementById('btnCpw').onclick=function(){
   document.getElementById('mcpOld').value='';document.getElementById('mcpNew').value='';
   document.getElementById('mcpNew2').value='';hideErr('mcpErr');openModal('mCpw');
@@ -1099,14 +1099,14 @@ document.getElementById('mcpCa').onclick=function(){closeModal('mCpw');};
 document.getElementById('mcpSv').onclick=async function(){
   var old=document.getElementById('mcpOld').value,n1=document.getElementById('mcpNew').value,n2=document.getElementById('mcpNew2').value;
   hideErr('mcpErr');
-  if(n1!==n2){showErr('mcpErr','Passwörter stimmen nicht überein.');return;}
+  if(n1!==n2){showErr('mcpErr','Passw\u00f6rter stimmen nicht \u00fcberein.');return;}
   if(n1.length<4){showErr('mcpErr','Min. 4 Zeichen.');return;}
   var res=await api('POST','/api/change_password',{name:CU,old_password:old,new_password:n1});
   if(res.error){showErr('mcpErr',res.error);return;}
-  closeModal('mCpw');alert('✓ Passwort geändert.');
+  closeModal('mCpw');alert('\u2713 Passwort ge\u00e4ndert.');
 };
 
-// ── BİLDİRİMLER ───────────────────────────────────
+// \u2500\u2500 B\u0130LD\u0130R\u0130MLER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadNotifs(){
   var n=await api('GET','/api/notifications/'+encodeURIComponent(CU));
   if(!Array.isArray(n))return;
@@ -1115,7 +1115,7 @@ async function loadNotifs(){
   var l=document.getElementById('nList');
   if(!n.length){l.innerHTML='<div class="nem">Keine Benachrichtigungen</div>';return;}
   l.innerHTML=n.map(function(x){
-    var icon={'request':'⏳','ready':'✅','accepted':'👍','project':'📋'}[x.type]||'🔔';
+    var icon={'request':'\u23f3','ready':'\u2705','accepted':'\u1f44d','project':'\u1f4cb'}[x.type]||'\u1f514';
     return'<div class="nit'+(x.read?'':' unread')+' type-'+(x.type||'info')+'">'
       +'<div>'+icon+' '+x.message+'</div><div class="ntm">'+x.created_at.substring(0,16).replace('T',' ')+'</div></div>';
   }).join('');
@@ -1132,20 +1132,20 @@ document.addEventListener('click',function(e){
   if(!p.contains(e.target)&&!document.getElementById('nBtn').contains(e.target))p.classList.remove('open');
 });
 
-// ── SEARCH ────────────────────────────────────────
+// \u2500\u2500 SEARCH \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function doSearch(v){var q=v.toLowerCase();document.querySelectorAll('.card').forEach(function(c){var n=c.querySelector('.cnm')?c.querySelector('.cnm').textContent.toLowerCase():'';c.style.display=n.includes(q)?'block':'none';});}
 
-// ── MODAL ──────────────────────────────────────────
+// \u2500\u2500 MODAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
-// ── DRAWER ─────────────────────────────────────────
+// \u2500\u2500 DRAWER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 document.getElementById('btnHam').onclick=function(){document.getElementById('drawer').classList.add('open');document.getElementById('dov').classList.add('open');};
 document.getElementById('dCl').onclick=closeDrawer;
 document.getElementById('dov').onclick=closeDrawer;
 function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('dov').classList.remove('open');}
 
-// ── INIT ───────────────────────────────────────────
+// \u2500\u2500 INIT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 (async function(){
   var su=sessionStorage.getItem('pw_u');
   var sr=sessionStorage.getItem('pw_r');
