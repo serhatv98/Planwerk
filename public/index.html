@@ -427,7 +427,11 @@ var L={
       rev:'Revision',annehmen:'Annehmen',keineIn:'Keine Inputs',keineOut:'Keine Outputs',
       vonAufg:'Von Aufgabe',fuerAufg:'F\u00fcr Aufgabe',person:'Person (opt.)',
       neueAufg:'Neue Aufgabe',bearbAufg:'Aufgabe bearbeiten',
-      abbrechen:'Abbrechen',speichern:'Speichern',zugang:'Projektzugang'},
+      abbrechen:'Abbrechen',speichern:'Speichern',zugang:'Projektzugang',
+      suchen:'Suchen...',loeschen:'Löschen',bearb2:'Bearbeiten',zugang2:'Zugang',
+      aufgabe:'+ Aufgabe',addProj:'+ Projekt',exit:'Exit',pw:'PW',adminLbl:'Admin',
+      notifications:'Benachrichtigungen',alleGel:'Alle gelesen',
+      neuesProj:'Neues Projekt',projBearb:'Projekt bearbeiten'},
   en:{aus:'Pending',inb:'In Progress',pru:'In Review',frei:'Approved',abg:'Done',
       alle:'All',gesamt:'Total',warten:'waiting',aktiv:'active',fertig:'done',
       eingang:'Input data',ausgang:'Output data',personen:'Persons & Info',verlauf:'Status history',
@@ -435,7 +439,11 @@ var L={
       rev:'Revision',annehmen:'Accept',keineIn:'No inputs',keineOut:'No outputs',
       vonAufg:'From task',fuerAufg:'For task',person:'Person (opt.)',
       neueAufg:'New task',bearbAufg:'Edit task',
-      abbrechen:'Cancel',speichern:'Save',zugang:'Project access'}
+      abbrechen:'Cancel',speichern:'Save',zugang:'Project access',
+      suchen:'Search...',loeschen:'Delete',bearb2:'Edit',zugang2:'Access',
+      aufgabe:'+ Task',addProj:'+ Project',exit:'Exit',pw:'PW',adminLbl:'Admin',
+      notifications:'Notifications',alleGel:'Mark all read',
+      neuesProj:'New project',projBearb:'Edit project'}
 };
 
 function T(k){return (L[lang]||L.de)[k]||k;}
@@ -468,6 +476,16 @@ function setLoginLang(l){
 function setLang(l){
   lang=l;
   document.querySelectorAll('#app .lbg').forEach(function(b){b.classList.toggle('active',b.textContent===l.toUpperCase());});
+  // Topbar
+  var sb=document.getElementById('sBox');if(sb)sb.placeholder=T('suchen');
+  var outb=document.getElementById('btnOut');if(outb)outb.innerHTML='&#8617; '+T('exit');
+  var admb=document.getElementById('btnAdm');if(admb)admb.innerHTML='&#128081; '+T('adminLbl');
+  // Sidebar butonlar
+  var sadd=document.getElementById('sAdd');if(sadd)sadd.textContent=T('addProj');
+  var dadd=document.getElementById('dAdd');if(dadd)dadd.textContent=T('addProj');
+  // Notif panel
+  var ntit=document.querySelector('.ntit');if(ntit)ntit.innerHTML='&#128276; '+T('notifications');
+  var nra=document.getElementById('nRa');if(nra)nra.textContent=T('alleGel');
   if(pid)renderProjView();
 }
 
@@ -604,17 +622,17 @@ function renderProject(proj){
     +'<div class="pm">&#128100; '+(proj.owner||'&mdash;')+'  &middot;  &#128197; '+(proj.deadline||'&mdash;')+'</div></div>';
   var btns=document.createElement('div');btns.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
   if(CR==='admin'){
-    var b1=document.createElement('button');b1.className='bs';b1.innerHTML='&#128101; Zugang';b1.onclick=function(){openMembersModal(proj);};btns.appendChild(b1);
-    var b2=document.createElement('button');b2.className='bs';b2.innerHTML='&#9999; Bearb.';b2.onclick=function(){openProjModal(proj);};btns.appendChild(b2);
-    var b3=document.createElement('button');b3.className='bs bd';b3.innerHTML='&#128465; L&ouml;schen';b3.onclick=async function(){
+    var b1=document.createElement('button');b1.className='bs';b1.innerHTML='&#128101; '+T('zugang2');b1.onclick=function(){openMembersModal(proj);};btns.appendChild(b1);
+    var b2=document.createElement('button');b2.className='bs';b2.innerHTML='&#9999; '+T('bearb2');b2.onclick=function(){openProjModal(proj);};btns.appendChild(b2);
+    var b3=document.createElement('button');b3.className='bs bd';b3.innerHTML='&#128465; '+T('loeschen');b3.onclick=async function(){
       if(!confirm(proj.name+' l\u00f6schen?'))return;
       await api('DELETE','/api/projects/'+pid);pid=null;await loadProjects();
     };btns.appendChild(b3);
   } else if(perm.edit){
-    var b2b=document.createElement('button');b2b.className='bs';b2b.innerHTML='&#9999; Bearb.';b2b.onclick=function(){openProjModal(proj);};btns.appendChild(b2b);
+    var b2b=document.createElement('button');b2b.className='bs';b2b.innerHTML='&#9999; '+T('bearb2');b2b.onclick=function(){openProjModal(proj);};btns.appendChild(b2b);
   }
   if(perm.edit){
-    var b4=document.createElement('button');b4.className='bp';b4.innerHTML='&#10010; Aufgabe';b4.onclick=function(){openAufgModal(null,proj);};btns.appendChild(b4);
+    var b4=document.createElement('button');b4.className='bp';b4.innerHTML='&#10010; '+T('aufgabe').replace('+ ','');b4.onclick=function(){openAufgModal(null,proj);};btns.appendChild(b4);
   }
   hdr.appendChild(btns);
   el.appendChild(hdr);
@@ -975,7 +993,7 @@ document.getElementById('sAdd').onclick=function(){openProjModal(null);};
 document.getElementById('dAdd').onclick=function(){openProjModal(null);closeDrawer();};
 function openProjModal(proj){
   editProjId=proj?proj.id:null;
-  document.getElementById('mProjTit').innerHTML='&#128196; '+(proj?'Projekt bearbeiten':'Neues Projekt');
+  document.getElementById('mProjTit').innerHTML='&#128196; '+(proj?T('projBearb'):T('neuesProj'));
   document.getElementById('fPN').value=proj?proj.name:'';
   document.getElementById('fPD').value=proj?proj.desc||'':'';
   document.getElementById('fPO').value=proj?proj.owner||'':CU;
